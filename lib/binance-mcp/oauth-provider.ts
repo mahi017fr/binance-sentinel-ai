@@ -50,11 +50,33 @@ export function getRedirectUrl(): string {
 export const CLIENT_METADATA: OAuthClientMetadata = {
   redirect_uris: [getRedirectUrl()],
   token_endpoint_auth_method: "none",
-  grant_types: ["authorization_code", "refresh_token"],
+  // Binance's authorization server advertises grant_types_supported:
+  // ["authorization_code"] only — do not add undeclared grant types.
+  grant_types: ["authorization_code"],
   response_types: ["code"],
   client_name: "Binance Sentinel AI",
   client_uri: getBaseUrl(),
-  scope: "",
+};
+
+/**
+ * The document served at /.well-known/oauth-client-metadata.json and used as
+ * the CIMD client_id. Per SEP-991, this document MUST include a `client_id`
+ * field that exactly equals the URL it is served from. The SDK's
+ * OAuthClientMetadata type omits `client_id` (it lives in the client
+ * information schema), so we use a superset type here.
+ */
+export interface ClientIdMetadataDocument extends OAuthClientMetadata {
+  client_id: string;
+}
+
+export const CLIENT_ID_METADATA_DOCUMENT: ClientIdMetadataDocument = {
+  client_id: getClientMetadataUrl(),
+  redirect_uris: [getRedirectUrl()],
+  token_endpoint_auth_method: "none",
+  grant_types: ["authorization_code"],
+  response_types: ["code"],
+  client_name: "Binance Sentinel AI",
+  client_uri: getBaseUrl(),
 };
 
 export class BinanceOAuthClientProvider implements OAuthClientProvider {

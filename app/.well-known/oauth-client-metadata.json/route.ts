@@ -16,12 +16,12 @@
  */
 
 import { NextResponse } from "next/server";
-import { CLIENT_METADATA } from "@/lib/binance-mcp/oauth-provider";
+import { CLIENT_ID_METADATA_DOCUMENT } from "@/lib/binance-mcp/oauth-provider";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  return NextResponse.json(CLIENT_METADATA, {
+  return NextResponse.json(CLIENT_ID_METADATA_DOCUMENT, {
     status: 200,
     headers: {
       "Content-Type": "application/json; charset=utf-8",

@@ -23,6 +23,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { startAuthorization } from "@modelcontextprotocol/sdk/client/auth.js";
 import { BinanceOAuthClientProvider } from "@/lib/binance-mcp/oauth-provider";
 import { runOAuthDiscovery } from "@/lib/binance-mcp/oauth-discovery";
+import { encryptPayload } from "@/lib/binance-mcp/oauth-store";
 
 const SESSION_COOKIE = "binance-oauth-session";
 
@@ -100,12 +101,27 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    // ── Step 5: Persist state + code_verifier in server session ─────────
-    const sessionId = provider.startSession(state, codeVerifier);
+    // RFC 8707 Resource Indicators: the MCP server's canonical URI must be
+    // included in the authorization request (MUST since the 2025-06-18 MCP
+    // spec revision). The SDK's startAuthorization does not add it, so append
+    // it here to match the token exchange, which sends the same `resource`.
+    authorizationUrl.searchParams.set(
+      "resource",
+      "https://agent.binance.com/mcp/agentic"
+    );
+
+    // ── Step 5: Persist state + code_verifier (encrypted, serverless-safe) ──
+    // The session payload is AES-256-GCM encrypted into an HttpOnly cookie so
+    // it survives across serverless invocations (see lib/binance-mcp/oauth-store).
+    const sessionCookie = encryptPayload({
+      state,
+      codeVerifier,
+      createdAt: Date.now(),
+    });
 
     // ── Step 6: Set session cookie and redirect to Binance ───────────────
     const response = NextResponse.redirect(authorizationUrl, 302);
-    response.cookies.set(SESSION_COOKIE, sessionId, {
+    response.cookies.set(SESSION_COOKIE, sessionCookie, {
       httpOnly: true,
       secure: true,
       sameSite: "lax",

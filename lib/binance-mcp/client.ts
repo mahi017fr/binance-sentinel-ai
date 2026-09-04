@@ -58,14 +58,21 @@ interface CapturedResponse {
  * enumerate its real tools. Runs the genuine SDK handshake and listTools().
  */
 export async function verifyBinanceMcp(
-  timeoutMs = 20000
+  options: { accessToken?: string; timeoutMs?: number } = {}
 ): Promise<BinanceMcpVerifyResult> {
+  const { accessToken, timeoutMs = 20000 } = options;
   let captured: CapturedResponse | undefined;
 
   const transport = new StreamableHTTPClientTransport(
     new URL(BINANCE_MCP_ENDPOINT),
     {
-      requestInit: {},
+      // When an access token is supplied, attach it as a Bearer credential so
+      // the initialize handshake runs authenticated. Never log or expose it.
+      requestInit: {
+        headers: accessToken
+          ? { Authorization: `Bearer ${accessToken}` }
+          : {},
+      },
       // Intercept the wire traffic so we can report the exact HTTP/auth
       // response without exposing anything sensitive.
       fetch: async (input, init) => {
