@@ -9,14 +9,19 @@ const server = new McpServer({
 
 const BINANCE_API = "https://api.binance.com";
 
-async function binanceFetch(path: string) {
+async function binanceFetch<T>(path: string): Promise<T> {
   const response = await fetch(`${BINANCE_API}${path}`);
 
   if (!response.ok) {
     throw new Error(`Binance API error: ${response.status}`);
   }
 
-  return response.json();
+  return (await response.json()) as T;
+}
+
+interface RawTicker24h {
+  symbol: string;
+  priceChangePercent: string;
 }
 
 // Tool 1: Get current price
@@ -27,7 +32,7 @@ server.tool(
     symbol: z.string().describe("Trading symbol, e.g. BTCUSDT"),
   },
   async ({ symbol }) => {
-    const data = await binanceFetch(
+    const data = await binanceFetch<{ symbol: string; price: string }>(
       `/api/v3/ticker/price?symbol=${symbol.toUpperCase()}`
     );
 
@@ -50,7 +55,7 @@ server.tool(
     symbol: z.string().describe("Trading symbol, e.g. BTCUSDT"),
   },
   async ({ symbol }) => {
-    const data = await binanceFetch(
+    const data = await binanceFetch<Record<string, string>>(
       `/api/v3/ticker/24hr?symbol=${symbol.toUpperCase()}`
     );
 
@@ -71,12 +76,12 @@ server.tool(
   "Get current 24-hour ticker statistics from Binance.",
   {},
   async () => {
-    const data = await binanceFetch("/api/v3/ticker/24hr");
+    const data = await binanceFetch<RawTicker24h[]>("/api/v3/ticker/24hr");
 
     const top = data
-      .filter((item: any) => item.symbol.endsWith("USDT"))
+      .filter((item) => item.symbol.endsWith("USDT"))
       .sort(
-        (a: any, b: any) =>
+        (a, b) =>
           Math.abs(Number(b.priceChangePercent)) -
           Math.abs(Number(a.priceChangePercent))
       )
@@ -111,7 +116,7 @@ server.tool(
       limit: String(limit ?? 100),
     });
 
-    const data = await binanceFetch(`/api/v3/klines?${params}`);
+    const data = await binanceFetch<unknown[][]>(`/api/v3/klines?${params}`);
 
     return {
       content: [

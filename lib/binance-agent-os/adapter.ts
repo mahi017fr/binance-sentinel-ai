@@ -28,9 +28,11 @@ import type {
 import { BinancePublicMarketDataProvider } from "./market-data";
 import { CoinGeckoMarketDataProvider } from "./coingecko";
 import { ChainedMarketDataProvider } from "./chain";
+import { BinanceMcpMarketDataProvider } from "./mcp";
 
 const BINANCE_ID: MarketDataSourceId = "binance-public-api";
 const COINGECKO_ID: MarketDataSourceId = "coingecko-public-api";
+const MCP_ID: MarketDataSourceId = "binance-mcp";
 
 /**
  * Registry of available standalone providers. New backends (e.g. a future
@@ -39,6 +41,11 @@ const COINGECKO_ID: MarketDataSourceId = "coingecko-public-api";
 const providers: Map<MarketDataSourceId, MarketDataProvider> = new Map();
 providers.set(BINANCE_ID, new BinancePublicMarketDataProvider());
 providers.set(COINGECKO_ID, new CoinGeckoMarketDataProvider());
+// Registered but INACTIVE by default: it is gated by
+// BINANCE_ENABLE_MCP_PROVIDER + BINANCE_MCP_ACCESS_TOKEN inside the provider
+// itself and is NOT a member of the default chain (Phase 10.1 rule 7). It can
+// be selected explicitly via BINANCE_MARKET_DATA_PROVIDER=binance-mcp.
+providers.set(MCP_ID, new BinanceMcpMarketDataProvider());
 
 /**
  * The default chained provider (Binance → CoinGecko). Lazily constructed and

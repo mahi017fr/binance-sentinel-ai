@@ -29,7 +29,7 @@ export async function GET() {
         quoteVolume: data.quoteVolume,
       },
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       {
         success: false,
