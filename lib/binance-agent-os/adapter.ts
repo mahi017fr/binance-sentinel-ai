@@ -29,10 +29,12 @@ import { BinancePublicMarketDataProvider } from "./market-data";
 import { CoinGeckoMarketDataProvider } from "./coingecko";
 import { ChainedMarketDataProvider } from "./chain";
 import { BinanceMcpMarketDataProvider } from "./mcp";
+import { BinanceCliMarketDataProvider } from "./cli";
 
 const BINANCE_ID: MarketDataSourceId = "binance-public-api";
 const COINGECKO_ID: MarketDataSourceId = "coingecko-public-api";
 const MCP_ID: MarketDataSourceId = "binance-mcp";
+const CLI_ID: MarketDataSourceId = "binance-cli-public-api";
 
 /**
  * Registry of available standalone providers. New backends (e.g. a future
@@ -46,6 +48,12 @@ providers.set(COINGECKO_ID, new CoinGeckoMarketDataProvider());
 // itself and is NOT a member of the default chain (Phase 10.1 rule 7). It can
 // be selected explicitly via BINANCE_MARKET_DATA_PROVIDER=binance-mcp.
 providers.set(MCP_ID, new BinanceMcpMarketDataProvider());
+// Registered from the official Binance skill's CLI tooling. Like the MCP
+// provider it is INACTIVE by default (gated by BINANCE_ENABLE_CLI_PROVIDER)
+// and is NOT in the default chain. Uses only public market-data commands — no
+// credentials, no signing, no account/trade tools. Selectable explicitly via
+// BINANCE_MARKET_DATA_PROVIDER=binance-cli-public-api.
+providers.set(CLI_ID, new BinanceCliMarketDataProvider());
 
 /**
  * The default chained provider (Binance → CoinGecko). Lazily constructed and

@@ -84,6 +84,7 @@ export interface MarketSnapshot {
 
 export type MarketDataSourceId =
   | "binance-public-api"
+  | "binance-cli-public-api"
   | "coingecko-public-api"
   | "binance-agent-os"
   | "binance-mcp";
