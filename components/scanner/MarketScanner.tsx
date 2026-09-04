@@ -28,21 +28,22 @@ function getSortValue(
   asset: MarketScanResult["assets"][number],
   key: SortKey
 ): number {
+  if (!asset) return 0;
   switch (key) {
     case "symbol":
       return 0;
     case "price":
-      return asset.price;
+      return asset.price ?? 0;
     case "change24h":
-      return asset.change24h;
+      return asset.change24h ?? 0;
     case "volatility":
-      return asset.volatility.value;
+      return asset.volatility?.value ?? 0;
     case "momentum":
-      return asset.momentum.value;
+      return asset.momentum?.value ?? 0;
     case "risk":
-      return asset.risk.score;
+      return asset.risk?.score ?? 0;
     case "activity":
-      return asset.activity.value;
+      return asset.activity?.value ?? 0;
     default:
       return 0;
   }
@@ -93,6 +94,12 @@ export function MarketScanner({ onAnalyzeAsset }: MarketScannerProps) {
         );
       }
       const data: MarketScanResult = await res.json();
+
+      // Defensive: ensure required arrays exist
+      if (!data || !Array.isArray(data.assets) || !Array.isArray(data.universe)) {
+        throw new Error("Scan returned malformed data. Please try again.");
+      }
+
       const latencyMs = performance.now() - startTime;
 
       const requestedCount = data.universe.length;
@@ -106,6 +113,17 @@ export function MarketScanner({ onAnalyzeAsset }: MarketScannerProps) {
         failureCount,
         data.scannedAt
       );
+
+      // Defensive: ensure highlights exists with required arrays
+      if (!data.highlights || typeof data.highlights !== "object") {
+        data.highlights = {
+          highVolatility: [],
+          strongMomentum: [],
+          elevatedRisk: [],
+          highActivity: [],
+          topMovers: [],
+        };
+      }
 
       setResult(data);
       setStatus("done");
@@ -137,7 +155,11 @@ export function MarketScanner({ onAnalyzeAsset }: MarketScannerProps) {
       const ms = REFRESH_OPTIONS.find((o) => o.value === autoRefresh)?.ms ?? 0;
       if (ms > 0) {
         timerRef.current = setInterval(() => {
-          if (mountedRef.current) handleScan();
+          if (mountedRef.current) {
+            handleScan().catch(() => {
+              // Auto-refresh scan failed; error state is set inside handleScan.
+            });
+          }
         }, ms);
       }
     }
@@ -154,14 +176,15 @@ export function MarketScanner({ onAnalyzeAsset }: MarketScannerProps) {
     }));
   }, []);
 
-  // Filter and sort assets
-  const filteredAssets = result
+  // Filter and sort assets — defensive against malformed data
+  const filteredAssets = result?.assets
     ? sortAssets(
-        result.assets.filter((a) =>
-          search.trim() === ""
+        result.assets.filter((a) => {
+          if (!a || typeof a.symbol !== "string") return false;
+          return search.trim() === ""
             ? true
-            : a.symbol.toLowerCase().includes(search.trim().toLowerCase())
-        ),
+            : a.symbol.toLowerCase().includes(search.trim().toLowerCase());
+        }),
         sort
       )
     : [];

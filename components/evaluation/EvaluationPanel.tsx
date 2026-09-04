@@ -19,9 +19,9 @@ function MetricRow({
         <span className="text-sm font-medium tabular-nums text-zinc-100">
           {value}
         </span>
-        {detail && (
+        {detail ? (
           <span className="ml-2 text-[10px] text-[var(--muted)]">{detail}</span>
-        )}
+        ) : null}
       </div>
     </div>
   );
@@ -62,7 +62,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function formatLatency(ms: number | null): string {
-  if (ms === null) return "—";
+  if (ms === null) return "\u2014";
   if (ms < 1000) return `${Math.round(ms)} ms`;
   return `${(ms / 1000).toFixed(2)} s`;
 }
@@ -116,7 +116,7 @@ export function EvaluationPanel() {
           value={
             metrics.scanRequestedCount > 0
               ? `${metrics.scanSuccessRate.toFixed(1)}%`
-              : "—"
+              : "\u2014"
           }
           detail={
             metrics.scanRequestedCount > 0
@@ -129,7 +129,7 @@ export function EvaluationPanel() {
           value={
             metrics.scanRequestedCount > 0
               ? `${metrics.scanFailureRate.toFixed(1)}%`
-              : "—"
+              : "\u2014"
           }
           detail={
             metrics.scanFailureCount > 0
@@ -137,7 +137,7 @@ export function EvaluationPanel() {
               : undefined
           }
         />
-        {metrics.totalScans > 0 && (
+        {metrics.totalScans > 0 ? (
           <MetricRow
             label="Total Scans"
             value={`${metrics.totalScans}`}
@@ -147,7 +147,7 @@ export function EvaluationPanel() {
                 : undefined
             }
           />
-        )}
+        ) : null}
 
         {/* Analysis section */}
         <SectionHeader label="Analysis" />
@@ -160,22 +160,17 @@ export function EvaluationPanel() {
               : undefined
           }
         />
-        <MetricRow
-          label="Pipeline Status"
-          value=""
-          detail=""
-        />
         <div className="flex items-center justify-between gap-4 py-2 border-b border-[var(--border)]/50">
           <span className="text-xs text-[var(--muted)]">Pipeline Status</span>
           <StatusBadge status={metrics.pipelineStatus} />
         </div>
-        {metrics.totalAnalyses > 0 && (
+        {metrics.totalAnalyses > 0 ? (
           <MetricRow
             label="Total Analyses"
             value={`${metrics.totalAnalyses}`}
             detail={`success rate ${metrics.cumulativeAnalysisSuccessRate.toFixed(0)}%`}
           />
-        )}
+        ) : null}
 
         {/* Data freshness */}
         <div className="flex items-center justify-between gap-4 py-2">

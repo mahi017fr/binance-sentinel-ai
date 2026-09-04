@@ -9,6 +9,10 @@
  *   < 5 minutes  → Fresh
  *   < 30 minutes → Recent
  *   ≥ 30 minutes → Stale
+ *
+ * getMetrics() returns a cached EvaluationMetrics object. The reference only
+ * changes when internal data mutates, so useSyncExternalStore callers get a
+ * stable snapshot (Object.is) between mutations.
  */
 
 import type {
@@ -47,6 +51,9 @@ function classifyPipelineStatus(
 /**
  * Singleton metrics state. Updated imperatively by the DashboardLayout
  * when scan/analysis events occur.
+ *
+ * The cached snapshot approach ensures useSyncExternalStore receives a stable
+ * object reference between mutations, preventing infinite re-render loops.
  */
 class MetricsTracker {
   private _scanLatencyMs: number | null = null;
@@ -69,6 +76,13 @@ class MetricsTracker {
   private _cumulativeAnalysisSuccessCount = 0;
   private _cumulativeAnalysisAttemptCount = 0;
 
+  // Cached snapshot — rebuilt only when data mutates
+  private _cachedMetrics: EvaluationMetrics | null = null;
+
+  private invalidateCache() {
+    this._cachedMetrics = null;
+  }
+
   /** Subscribe to metric changes. Returns an unsubscribe function. */
   subscribe(listener: () => void): () => void {
     this._listeners.push(listener);
@@ -78,6 +92,8 @@ class MetricsTracker {
   }
 
   private notify() {
+    // Invalidate cached snapshot so next getMetrics() builds fresh
+    this.invalidateCache();
     for (const l of this._listeners) l();
   }
 
@@ -132,7 +148,16 @@ class MetricsTracker {
     this.notify();
   }
 
+  /**
+   * Returns a stable EvaluationMetrics reference. The same object is returned
+   * until the next mutation, which is required for useSyncExternalStore to
+   * avoid infinite re-render loops (Object.is comparison).
+   */
   getMetrics(): EvaluationMetrics {
+    if (this._cachedMetrics !== null) {
+      return this._cachedMetrics;
+    }
+
     const scanSuccessRate =
       this._scanRequestedCount > 0
         ? Math.round(
@@ -179,7 +204,7 @@ class MetricsTracker {
           ) / 100
         : 0;
 
-    return {
+    this._cachedMetrics = {
       dataSourceActive: true,
       dataSourceLabel: "Binance Public REST API",
       scanLatencyMs: this._scanLatencyMs,
@@ -200,6 +225,8 @@ class MetricsTracker {
       cumulativeScanSuccessRate,
       cumulativeAnalysisSuccessRate,
     };
+
+    return this._cachedMetrics;
   }
 }
 

@@ -10,6 +10,7 @@ import { WorkflowVisualizer } from "@/components/analysis/WorkflowVisualizer";
 import { MarketScanner } from "@/components/scanner/MarketScanner";
 import { EvaluationPanel } from "@/components/evaluation/EvaluationPanel";
 import { Card } from "@/components/ui/Card";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { useAnalysisStream } from "@/hooks/useAnalysisStream";
 import { buildAnalysisQuery } from "@/lib/scanner/symbol";
 import { metricsTracker } from "@/lib/evaluation/metrics";
@@ -143,42 +144,52 @@ export function DashboardLayout() {
         <Sidebar active={active} onNavigate={setActive} />
 
         <main className="flex-1 px-4 py-6 pb-24 sm:px-6 md:pb-10">
-          {active === "overview" && <OverviewPanel />}
+          {active === "overview" && (
+            <ErrorBoundary viewName="Overview">
+              <OverviewPanel />
+            </ErrorBoundary>
+          )}
           {active === "analyze" && (
-            <AnalysisDashboard
-              status={stream.status}
-              workflow={stream.workflow}
-              report={stream.report}
-              error={stream.error}
-              query={query}
-              onQueryChange={setQuery}
-              onAnalyze={handleManualAnalyze}
-              onCancel={stream.cancel}
-              analysisSource={analysisSource}
-              onBackToScanner={analysisSource === "scanner" ? handleBackToScanner : undefined}
-            />
+            <ErrorBoundary viewName="Analyze">
+              <AnalysisDashboard
+                status={stream.status}
+                workflow={stream.workflow}
+                report={stream.report}
+                error={stream.error}
+                query={query}
+                onQueryChange={setQuery}
+                onAnalyze={handleManualAnalyze}
+                onCancel={stream.cancel}
+                analysisSource={analysisSource}
+                onBackToScanner={analysisSource === "scanner" ? handleBackToScanner : undefined}
+              />
+            </ErrorBoundary>
           )}
           {active === "scanner" && (
-            <div className="space-y-6">
-              <MarketScanner onAnalyzeAsset={handleAnalyzeAsset} />
-              <div className="mx-auto max-w-6xl grid gap-4 sm:grid-cols-2">
-                <EvaluationPanel />
-                <DataSourceStatus />
+            <ErrorBoundary viewName="Market Scanner">
+              <div className="space-y-6">
+                <MarketScanner onAnalyzeAsset={handleAnalyzeAsset} />
+                <div className="mx-auto max-w-6xl grid gap-4 sm:grid-cols-2">
+                  <EvaluationPanel />
+                  <DataSourceStatus />
+                </div>
               </div>
-            </div>
+            </ErrorBoundary>
           )}
           {active === "workflow" && (
-            <div className="mx-auto max-w-3xl space-y-4">
-              <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-zinc-100">
-                  Agent Workflow
-                </h1>
-                <p className="mt-1 text-sm text-[var(--muted)]">
-                  Watch the multi-agent pipeline progress in real time.
-                </p>
+            <ErrorBoundary viewName="Workflow">
+              <div className="mx-auto max-w-3xl space-y-4">
+                <div>
+                  <h1 className="text-2xl font-semibold tracking-tight text-zinc-100">
+                    Agent Workflow
+                  </h1>
+                  <p className="mt-1 text-sm text-[var(--muted)]">
+                    Watch the multi-agent pipeline progress in real time.
+                  </p>
+                </div>
+                <WorkflowVisualizer workflow={stream.workflow} />
               </div>
-              <WorkflowVisualizer workflow={stream.workflow} />
-            </div>
+            </ErrorBoundary>
           )}
         </main>
       </div>
