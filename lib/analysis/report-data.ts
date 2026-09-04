@@ -12,6 +12,8 @@ import type { MarketData } from "@/lib/llm/schema";
 
 const SOURCE_LABELS: Record<string, string> = {
   "binance-public-api": "Binance",
+  "binance-cli-public-api": "Binance CLI (Public Market Data)",
+  "binance-mcp": "Binance MCP",
   "coingecko-public-api": "CoinGecko",
 };
 

@@ -23,6 +23,7 @@ Pre-submission verification checklist for Binance Sentinel AI.
 
 - [ ] Binance provider tested (primary)
 - [ ] CoinGecko fallback tested (Binance unavailable → fallback succeeds)
+- [ ] Binance CLI provider tested when enabled (local; public commands only, no credentials)
 - [ ] No fake/mock/hardcoded market data anywhere
 - [ ] Source metadata visible on scanner (provider, label, fallbackUsed, fetchedAt)
 - [ ] Per-asset source visible on analysis asset summaries
@@ -36,6 +37,8 @@ Pre-submission verification checklist for Binance Sentinel AI.
 - [ ] OAuth/MCP tokens (if any) server-side only
 - [ ] Research-only disclaimer present and visible
 - [ ] MCP status is honestly reported (not claimed active)
+- [ ] MCP external blocker documented (Binance: "The AI Agent you are using is not currently supported")
+- [ ] No `binance-cli` binary assumed in production/serverless (CLI provider is local-only and gated)
 
 ## Build
 

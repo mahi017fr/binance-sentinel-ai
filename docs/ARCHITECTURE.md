@@ -328,12 +328,30 @@ is implemented by:
 | `BinancePublicMarketDataProvider` | `binance-agent-os/market-data.ts` | **Primary**, active |
 | `CoinGeckoMarketDataProvider` | `binance-agent-os/coingecko.ts` | **Fallback**, active |
 | `ChainedMarketDataProvider` | `binance-agent-os/chain.ts` | Compose primary + fallback |
+| `BinanceCliMarketDataProvider` | `binance-agent-os/cli.ts` | **Optional**, gated (public `binance-cli` commands, no credentials), not in the default chain |
+| `BinanceMcpMarketDataProvider` | `binance-agent-os/mcp.ts` | **Prepared**, gated (requires a real token), not in the default chain |
 
 The adapter (`adapter.ts`) returns a `ChainedMarketDataProvider` whose
 `runChain` tries Binance first and, on any Binance failure (network, restricted
 location, availability), fails over to CoinGecko. Each successful call is
 served by exactly one provider and is labeled honestly — fallback data is never
 claimed to be Binance data.
+
+### Binance CLI Integration (optional, local-only)
+
+The `BinanceCliMarketDataProvider` invokes the **official** `binance-cli`
+binary (from the installed Binance skill, `.agents/skills/binance`) as a
+subprocess, restricted to public SPOT market-data commands: `spot klines`,
+`spot ticker24hr`, `spot exchange-info`. No credentials, no `--signed`
+commands, no account/trading functionality. Symbols must match
+`/^[A-Z][A-Z0-9]{1,29}$/`, intervals come from a fixed whitelist, and args are
+quoted and executed through a Windows-safe `cmd.exe` shim with stdin closed and
+hard timeout.
+
+It is **disabled by default** (`BINANCE_ENABLE_CLI_PROVIDER=1` + explicit
+`BINANCE_MARKET_DATA_PROVIDER=binance-cli-public-api` selection). Because it
+depends on a local binary it is for **local/self-hosted** use; Vercel/serverless
+deployments keep the default Binance → CoinGecko chain.
 
 ### Data Source Transparency
 
@@ -397,10 +415,15 @@ claimed to be Binance data.
 
 ### Why MCP is not active
 
-The Binance MCP endpoint requires OAuth authorization. A valid, verified
-end-to-end authorization flow is not in place, so MCP is intentionally left
-out of the live data pipeline to avoid claiming unsupported functionality.
-The live pipeline uses Binance REST (primary) + CoinGecko REST (fallback).
+A real authorized connection attempt to the official Binance Agent MCP endpoint
+was rejected by Binance with **"The AI Agent you are using is not currently
+supported."** That is an external supported-agent restriction on Binance's side;
+we do not bypass it. Until a supported-agent authorization flow is available,
+MCP is intentionally left out of the live data pipeline. The live pipeline uses
+Binance REST (primary) + CoinGecko REST (fallback). The pipeline activates the
+MCP provider only when `BINANCE_ENABLE_MCP_PROVIDER=1`, a real
+`BINANCE_MCP_ACCESS_TOKEN`, and explicit selection are all present — and never
+before a real `listTools()` handshake succeeds.
 
 **Architecture is modular**: The `MarketDataProvider` adapter pattern allows
 swapping in an MCP-backed provider without changing the analysis engine or

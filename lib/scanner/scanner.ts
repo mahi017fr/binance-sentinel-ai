@@ -54,6 +54,8 @@ import {
 /** Human-readable labels for the provider ids reported in scan results. */
 const SOURCE_LABELS: Record<string, string> = {
   "binance-public-api": "Binance",
+  "binance-cli-public-api": "Binance CLI (Public Market Data)",
+  "binance-mcp": "Binance MCP",
   "coingecko-public-api": "CoinGecko",
 };
 
@@ -275,7 +277,10 @@ export async function scanMarketUniverse(): Promise<MarketScanResult> {
   // If no asset could be fetched at all, the source is unknown and no fallback
   // was "used" (nothing was served by any provider).
   const servedAny = tickers.length > 0;
-  const fallbackUsed = servedAny && activeProviderId !== "binance-public-api";
+  // A "fallback" only means the default chain's CoinGecko fallback provider
+  // served the scan. Explicit provider selections (Binance CLI, Binance MCP,
+  // forced provider overrides) are primary providers, not fallbacks.
+  const fallbackUsed = servedAny && activeProviderId === "coingecko-public-api";
 
   const sourceMetadata: ScannerSourceMetadata = {
     provider: activeProviderId,

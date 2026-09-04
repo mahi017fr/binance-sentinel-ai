@@ -104,8 +104,7 @@ function runCli(args: string[], timeoutMs = CLI_TIMEOUT_MS): Promise<string> {
     const isWindows = process.platform === "win32";
     const command = isWindows ? `binance-cli ${args.map(quoteArg).join(" ")}` : "binance-cli";
 
-    const child = spawn(
-      isWindows ? (process.env.ComSpec ?? "cmd.exe") : "binance-cli",
+    const child = spawn(/*turbopackIgnore: true*/ isWindows ? (process.env.ComSpec ?? "cmd.exe") : "binance-cli",
       isWindows ? ["/d", "/s", "/c", command] : args,
       {
         stdio: ["pipe", "pipe", "pipe"],

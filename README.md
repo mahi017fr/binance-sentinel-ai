@@ -55,6 +55,12 @@ No trading functionality. No buy/sell recommendations. Research only.
   claimed as Binance
 - **Provider Chain** — tries Binance first, automatically fails over to
   CoinGecko when Binance is unavailable
+- **Optional Binance CLI provider** — public market-data commands from the
+  official Binance skill via the `binance-cli` binary (no credentials,
+  verified live, disabled by default)
+- **Optional Binance MCP provider** — real Streamable HTTP client for the
+  official Binance Agent MCP endpoint; prepared but inactive until a valid
+  authorized connection is available
 
 ## Live Demo Workflow
 
@@ -144,15 +150,51 @@ durations.
 
 ## Market Data Sources
 
-| Priority | Provider | Auth | Fields |
-|---|---|---|---|
-| Primary | Binance Public REST API | None | price, 24h change, high, low, volume, klines |
-| Fallback | CoinGecko Public REST API | None | price, 24h change, high, low, USD volume, OHLC |
+| Priority | Provider | Auth | Fields | Status |
+|---|---|---|---|---|
+| Primary | Binance Public REST API | None | price, 24h change, high, low, volume, klines | Active |
+| Fallback | CoinGecko Public REST API | None | price, 24h change, high, low, USD volume, OHLC | Active |
+| Optional | Binance CLI (`binance-cli` binary) | None | price, 24h change, high, low, volume, klines, exchange info | Available, off by default |
+| Optional | Binance Agent MCP | Bearer access token | market-data tools (when connected) | Prepared, inactive |
 
 The provider chain tries **Binance first**. If Binance is unavailable from the
 deployment environment (restricted location / network / availability), it
 fails over to **CoinGecko**. Fallback data is never claimed as Binance data —
 every response and UI indicator labels its real source.
+
+The active backend can be forced via `BINANCE_MARKET_DATA_PROVIDER` (e.g.
+`binance-cli-public-api` to route the pipeline through the CLI provider, or
+`binance-mcp` when a real token is configured).
+
+## Binance CLI Integration
+
+The optional CLI provider (`lib/binance-agent-os/cli.ts`) integrates the
+**official Binance skill tooling** (`.agents/skills/binance`) by invoking the
+`binance-cli` binary as a subprocess, restricted to the **read-only, public,
+unauthenticated** SPOT market-data commands documented in the skill:
+
+- `spot klines`
+- `spot ticker24hr`
+- `spot exchange-info`
+
+No API credentials are required (public endpoints only) and no `--signed`,
+`--profile`, account, balance, transfer, or trading command is ever invoked.
+Symbols are validated with `/^[A-Z][A-Z0-9]{1,29}$/`, intervals come from a
+fixed whitelist, and every subprocess call is Windows-safe (quoted args via
+`cmd.exe` shim, stdin closed to avoid the non-TTY hang, hard timeouts).
+
+It is **disabled by default** and is **not** in the default chain. Enable it in
+a local/development environment with:
+
+```
+BINANCE_ENABLE_CLI_PROVIDER=1
+BINANCE_MARKET_DATA_PROVIDER=binance-cli-public-api
+```
+
+Because it shells out to a local binary, it is intended for **local dev /
+self-hosted** use. On Vercel/serverless it is not available, so deployments
+there simply keep the default Binance → CoinGecko chain — the production
+fallback is never broken by the CLI provider.
 
 ## Binance Agent OS / MCP Status
 
@@ -164,7 +206,15 @@ analysis pipeline.
 | Infrastructure | Prepared — real connectivity probe, OAuth discovery, client provider, and diagnostic routes (server-side) |
 | Authentication | Incomplete — OAuth/PKCE scaffolding exists; no verified end-to-end authorization |
 | Pipeline integration | None — MCP not wired into the data flow |
-| Current limitation | The Binance MCP endpoint requires OAuth authorization; integration proceeds only when a working authorized flow is confirmed |
+| Current limitation | **External blocker:** Binance's hosted Agent MCP endpoint rejected our real authorization attempt with "The AI Agent you are using is not currently supported." MCP activation therefore requires an official Binance supported-agent credential; we do not bypass that restriction. |
+
+The MCP provider is gated on **all** of: `BINANCE_ENABLE_MCP_PROVIDER=1`, a
+real `BINANCE_MCP_ACCESS_TOKEN`, and explicit selection via
+`BINANCE_MARKET_DATA_PROVIDER=binance-mcp`. Without them every MCP method
+throws and the default Binance → CoinGecko chain serves traffic. Discovered
+tool names come only from a **real** `listTools()` response — nothing is
+hardcoded or fabricated — and any trading / order / account / balance /
+transfer / withdrawal / margin tool is explicitly blocked, never called.
 
 Diagnostic routes (`/api/mcp/verify`, `/api/mcp/discovery`, `/api/auth/status`)
 perform **real** connectivity and OAuth-discovery checks against the official
@@ -194,8 +244,14 @@ MCP-backed provider when a verified authorized connection is available.
 - **CoinGecko OHLC** provides real price bars but not per-bar volume (the
   analysis modules that rely on volume degrade gracefully; trend/volatility/
   drawdown are price-based and unaffected).
-- **Binance MCP is not active** — OAuth authorization is not completed, so MCP
-  data is intentionally excluded from the live pipeline.
+- **Binance hosted MCP is not active** — Binance's Agent MCP endpoint rejected
+  our real authorization attempt with "The AI Agent you are using is not
+  currently supported." This is an external (Binance-side) supported-agent
+  restriction; the app will not bypass it and does not claim MCP data that was
+  not truly served. MCP data is intentionally excluded from the live pipeline.
+- **Binance CLI provider is local-only** — it shells out to the `binance-cli`
+  binary, so it is not available on Vercel/serverless and is disabled by
+  default; the default chain is unaffected.
 - LLM report generation defaults to a deterministic reporter when no OpenAI key
   is configured (the quantitative analysis is always real and deterministic).
 
@@ -221,21 +277,34 @@ These are **not** measures of trading accuracy or investment returns.
 ## Setup
 
 ```bash
+cp .env.example .env.local   # optional; all variables are optional
 npm install
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
+The app works out of the box with **no environment variables** (public Binance
+REST → CoinGecko fallback, deterministic LLM mode).
+
 ### Environment Variables (all optional)
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `BINANCE_API_BASE_URL` | `https://api.binance.com` | Override Binance REST API base |
+| `BINANCE_MARKET_DATA_PROVIDER` | `binance-public-api` (chain) | Force a specific backend: `binance-public-api`, `coingecko-public-api`, `binance-mcp`, or `binance-cli-public-api` |
+| `BINANCE_ENABLE_CLI_PROVIDER` | unset | `1` activates the official `binance-cli` public market-data provider (local-only, no credentials) |
+| `BINANCE_ENABLE_MCP_PROVIDER` | unset | `1` activates the MCP provider gate (requires a real access token below) |
+| `BINANCE_MCP_ACCESS_TOKEN` | — | Server-side Bearer token for the official Binance Agent MCP endpoint (never exposed to the browser) |
+| `BINANCE_MCP_ENDPOINT_URL` | `https://agent.binance.com/mcp/agentic` | Override the MCP endpoint |
+| `BINANCE_MCP_STORE_SECRET` | dev-only fallback | 32+ char secret encrypting the OAuth token cookie (set in production) |
 | `LLM_PROVIDER` | `mock` | `"mock"` or `"openai"` for report generation |
 | `OPENAI_API_KEY` | — | Enables real OpenAI LLM output |
 | `OPENAI_MODEL` | `gpt-4o-mini` | Model to use with OpenAI |
 | `NEXT_PUBLIC_BASE_URL` | `http://localhost:3000` | Public URL for OAuth client metadata |
+
+> Note: `ANTHROPIC_API_KEY` appears in `.env.example` for reference only; the
+> current LLM client resolves `mock` or `openai`, so Anthropic is not wired yet.
 
 ## Deployment
 
