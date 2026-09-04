@@ -12,6 +12,8 @@ import { ComparisonView } from "./ComparisonView";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 
+export type AnalysisSource = "scanner" | null;
+
 interface AnalysisDashboardProps {
   status: AnalysisStatus;
   workflow: WorkflowStage[];
@@ -21,6 +23,8 @@ interface AnalysisDashboardProps {
   onQueryChange: (query: string) => void;
   onAnalyze: (query: string) => void;
   onCancel: () => void;
+  analysisSource?: AnalysisSource;
+  onBackToScanner?: () => void;
 }
 
 function EmptyState({ onRun }: { onRun: (q: string) => void }) {
@@ -80,6 +84,62 @@ function EmptyState({ onRun }: { onRun: (q: string) => void }) {
   );
 }
 
+function AnalysisContext({
+  source,
+  query,
+  status,
+}: {
+  source: AnalysisSource;
+  query: string;
+  status: AnalysisStatus;
+}) {
+  if (status === "idle" && !query) return null;
+
+  return (
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
+      <div className="flex flex-wrap items-center gap-3 text-xs">
+        {source === "scanner" && (
+          <div className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-[var(--safe)]" aria-hidden="true" />
+            <span className="text-[var(--muted)]">Source:</span>
+            <span className="font-medium text-zinc-200">Live Market Scan</span>
+          </div>
+        )}
+        {source === null && query && (
+          <div className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#f0b90b]" aria-hidden="true" />
+            <span className="text-[var(--muted)]">Source:</span>
+            <span className="font-medium text-zinc-200">Manual Query</span>
+          </div>
+        )}
+        {query && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-[var(--muted)]">Asset:</span>
+            <span className="font-medium text-zinc-200">
+              {query.replace(/^(Analyze|Analyze the risk of|Compare)\s+/i, "").split(" ")[0]}
+            </span>
+          </div>
+        )}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[var(--muted)]">Pipeline:</span>
+          {status === "idle" && (
+            <span className="font-medium text-[var(--muted)]">Ready</span>
+          )}
+          {status === "loading" && (
+            <span className="font-medium text-[#f0b90b]">Running</span>
+          )}
+          {status === "done" && (
+            <span className="font-medium text-[var(--safe)]">Complete</span>
+          )}
+          {status === "error" && (
+            <span className="font-medium text-[var(--danger)]">Failed</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AnalysisDashboard({
   status,
   workflow,
@@ -89,6 +149,8 @@ export function AnalysisDashboard({
   onQueryChange,
   onAnalyze,
   onCancel,
+  analysisSource,
+  onBackToScanner,
 }: AnalysisDashboardProps) {
   const loading = status === "loading";
 
@@ -96,7 +158,24 @@ export function AnalysisDashboard({
     <div className="mx-auto max-w-6xl">
       {/* Page header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-100">
+        <div className="flex flex-wrap items-center gap-3">
+          {onBackToScanner && (
+            <button
+              onClick={onBackToScanner}
+              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-1 text-xs font-medium text-[var(--muted)] transition hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f0b90b]"
+            >
+              <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M19 12H5" />
+                <polyline points="12 19 5 12 12 5" />
+              </svg>
+              Back to Scanner
+            </button>
+          )}
+          {analysisSource === "scanner" && (
+            <Badge tone="accent">Source: Live Market Scan</Badge>
+          )}
+        </div>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-100">
           Analyze
         </h1>
         <p className="mt-1 text-sm text-[var(--muted)]">
@@ -104,8 +183,11 @@ export function AnalysisDashboard({
         </p>
       </div>
 
+      {/* Analysis context bar */}
+      <AnalysisContext source={analysisSource ?? null} query={query} status={status} />
+
       {/* Query area */}
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.5)]">
+      <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.5)]">
         <QueryInput
           value={query}
           onChange={onQueryChange}

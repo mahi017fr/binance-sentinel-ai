@@ -1,12 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Header } from "./Header";
 import { MobileNav, Sidebar, type ViewId } from "./Sidebar";
 import { AnalysisDashboard } from "@/components/analysis/AnalysisDashboard";
+import type { AnalysisSource } from "@/components/analysis/AnalysisDashboard";
+import { DataSourceStatus } from "@/components/analysis/DataSourceStatus";
 import { WorkflowVisualizer } from "@/components/analysis/WorkflowVisualizer";
+import { MarketScanner } from "@/components/scanner/MarketScanner";
+import { EvaluationPanel } from "@/components/evaluation/EvaluationPanel";
 import { Card } from "@/components/ui/Card";
 import { useAnalysisStream } from "@/hooks/useAnalysisStream";
+import { buildAnalysisQuery } from "@/lib/scanner/symbol";
+import { metricsTracker } from "@/lib/evaluation/metrics";
 
 function StepRow({
   title,
@@ -64,8 +70,10 @@ function OverviewPanel() {
         </div>
         <p className="mt-5 text-xs leading-5 text-[var(--muted)]">
           Open the{" "}
-          <span className="text-zinc-300">Analyze</span> tab to ask a question,
-          or watch the agents run live in the{" "}
+          <span className="text-zinc-300">Market Scanner</span> to scan
+          multiple assets, or go to{" "}
+          <span className="text-zinc-300">Analyze</span> to ask a question
+          directly. Watch agents run live in the{" "}
           <span className="text-zinc-300">Workflow</span> tab.
         </p>
       </Card>
@@ -76,7 +84,56 @@ function OverviewPanel() {
 export function DashboardLayout() {
   const [active, setActive] = useState<ViewId>("analyze");
   const [query, setQuery] = useState("");
+  const [analysisSource, setAnalysisSource] = useState<AnalysisSource>(null);
   const stream = useAnalysisStream();
+  const analysisStartTime = useRef<number | null>(null);
+
+  const handleAnalyzeAsset = useCallback(
+    (symbol: string) => {
+      const q = buildAnalysisQuery(symbol);
+      setQuery(q);
+      setAnalysisSource("scanner");
+      setActive("analyze");
+      setTimeout(() => {
+        analysisStartTime.current = performance.now();
+        metricsTracker.recordAnalysisStart();
+        stream.analyze(q);
+      }, 50);
+    },
+    [stream]
+  );
+
+  const handleBackToScanner = useCallback(() => {
+    setAnalysisSource(null);
+    setActive("scanner");
+  }, []);
+
+  const handleManualAnalyze = useCallback(
+    (q: string) => {
+      setAnalysisSource(null);
+      analysisStartTime.current = performance.now();
+      metricsTracker.recordAnalysisStart();
+      stream.analyze(q);
+    },
+    [stream]
+  );
+
+  // Track analysis completion for evaluation metrics
+  const prevStatus = useRef(stream.status);
+  useEffect(() => {
+    if (prevStatus.current !== stream.status) {
+      if (stream.status === "done" && analysisStartTime.current !== null) {
+        const latency = performance.now() - analysisStartTime.current;
+        metricsTracker.recordAnalysisComplete(latency);
+        analysisStartTime.current = null;
+      }
+      if (stream.status === "error" && analysisStartTime.current !== null) {
+        metricsTracker.recordAnalysisError();
+        analysisStartTime.current = null;
+      }
+      prevStatus.current = stream.status;
+    }
+  }, [stream.status]);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -95,9 +152,20 @@ export function DashboardLayout() {
               error={stream.error}
               query={query}
               onQueryChange={setQuery}
-              onAnalyze={stream.analyze}
+              onAnalyze={handleManualAnalyze}
               onCancel={stream.cancel}
+              analysisSource={analysisSource}
+              onBackToScanner={analysisSource === "scanner" ? handleBackToScanner : undefined}
             />
+          )}
+          {active === "scanner" && (
+            <div className="space-y-6">
+              <MarketScanner onAnalyzeAsset={handleAnalyzeAsset} />
+              <div className="mx-auto max-w-6xl grid gap-4 sm:grid-cols-2">
+                <EvaluationPanel />
+                <DataSourceStatus />
+              </div>
+            </div>
           )}
           {active === "workflow" && (
             <div className="mx-auto max-w-3xl space-y-4">

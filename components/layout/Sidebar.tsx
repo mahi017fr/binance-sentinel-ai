@@ -1,6 +1,6 @@
 "use client";
 
-export type ViewId = "overview" | "analyze" | "workflow";
+export type ViewId = "overview" | "analyze" | "scanner" | "workflow";
 
 export interface NavItem {
   id: ViewId;
@@ -32,6 +32,18 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
+    id: "scanner",
+    label: "Market Scanner",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" />
+        <path d="M21 21l-4.3-4.3" />
+        <path d="M8 11h6" />
+        <path d="M11 8v6" />
+      </svg>
+    ),
+  },
+  {
     id: "workflow",
     label: "Workflow",
     icon: (
@@ -39,7 +51,7 @@ const NAV_ITEMS: NavItem[] = [
         <rect x="3" y="12" width="6" height="6" rx="1" />
         <rect x="15" y="4" width="6" height="6" rx="1" />
         <rect x="15" y="14" width="6" height="6" rx="1" />
-        <path d="M9 15h3a2 2 0 0 0 2-2v-3" />
+        <path d="M9 15h3a2 2 0 002-2v-3" />
       </svg>
     ),
   },
