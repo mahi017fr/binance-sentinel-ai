@@ -5,16 +5,20 @@ Technical architecture documentation for Binance Sentinel AI.
 ## System Overview
 
 Binance Sentinel AI is a Next.js 16 application with a deterministic analysis
-engine, multi-agent pipeline, and live market scanner. It uses public Binance
-market data and requires no authentication for core functionality.
+engine, multi-agent pipeline, and live market scanner. It uses live public
+market data with a primary Binance provider and a verified CoinGecko fallback,
+and requires no authentication for core functionality.
 
 ```mermaid
 flowchart TD
     A[User] --> B[Next.js Dashboard]
     B --> C[API Routes]
-    C --> D[Market Data Provider]
-    D --> E[Binance Public REST API]
-    E --> F[Deterministic Analysis Engine]
+    C --> D[Chained Market Data Provider]
+    D --> D1{Try Binance first}
+    D1 -->|ok| E1[Binance Public REST API]
+    D1 -->|unavailable| E2[CoinGecko Public REST API fallback]
+    E1 --> F[Deterministic Analysis Engine]
+    E2 --> F
     F --> G[Agent Pipeline]
     G --> H[SSE Streaming]
     H --> B
@@ -25,6 +29,28 @@ flowchart TD
     J --> K[Asset Selection]
     K --> G
 ```
+
+## Active vs Prepared Capabilities
+
+### ACTIVE NOW
+
+- **Binance Public REST API** — primary market data source (no auth)
+- **CoinGecko Public REST API** — verified real fallback (no auth), used
+  automatically when Binance is unreachable (e.g. restricted deployment envs)
+- **Market Scanner** — live multi-asset classification
+- **Analysis pipeline** — deterministic engine + 5-stage agent workflow
+- **SSE streaming** — real-time agent progress
+- **Provider chain with honest source metadata** — every response and UI labels
+  the actual provider used
+
+### PREPARED BUT NOT ACTIVE
+
+- **Binance MCP** — connectivity-layer, OAuth discovery, and client/provider
+  code exist, but MCP is **not** wired into the scanner or analysis pipeline
+- **OAuth token exchange** — authorization code + PKCE infrastructure exists,
+  but a completed, verified end-to-end authorization flow is not in place
+- **MCP-backed MarketDataProvider** — not registered / not used; the chain
+  currently uses Binance REST + CoinGecko REST only
 
 ## Frontend Architecture
 
@@ -104,19 +130,25 @@ sequenceDiagram
     participant U as User
     participant FE as MarketScanner
     participant API as /api/market-scan
-    participant MD as MarketDataProvider
+    participant MD as Chained MarketDataProvider
     participant BN as Binance REST API
+    participant CG as CoinGecko REST API
 
     U->>FE: Click "Scan Market"
     FE->>API: GET /api/market-scan
-    API->>MD: getTicker24h(symbol) × N
-    MD->>BN: GET /api/v3/ticker/24hr
-    BN-->>MD: Ticker24h
-    MD-->>API: Ticker24h[]
+    API->>MD: getTicker24h(symbol) × N (batched)
+    alt Binance available
+        MD->>BN: GET /api/v3/ticker/24hr
+        BN-->>MD: Ticker24h (source=binance)
+    else Binance unavailable
+        MD->>CG: GET /coins/markets (batched)
+        CG-->>MD: real data (source=coingecko)
+    end
+    MD-->>API: tickers + source metadata
     API->>API: Classify volatility, momentum, risk, activity
     API->>API: Zod validation
-    API-->>FE: MarketScanResult JSON
-    FE->>FE: Render table, summary, highlights
+    API-->>FE: MarketScanResult JSON (+ source)
+    FE->>FE: Render table, summary, highlights, source notice
     FE->>FE: Record scan metrics
 ```
 
@@ -128,22 +160,28 @@ sequenceDiagram
     participant FE as AnalysisDashboard
     participant API as /api/analysis
     participant PL as Pipeline
-    participant MD as MarketDataProvider
+    participant MD as Chained MarketDataProvider
     participant BN as Binance REST API
+    participant CG as CoinGecko REST API
 
     U->>FE: Submit query
     FE->>API: POST /api/analysis {query}
     loop Each agent stage
         API->>PL: yield agent-start
         PL->>MD: getMarketSnapshot()
-        MD->>BN: REST calls
-        BN-->>MD: MarketSnapshot
+        alt Binance available
+            MD->>BN: REST calls
+            BN-->>MD: MarketSnapshot (source=binance)
+        else Binance unavailable
+            MD->>CG: markets + ohlc
+            CG-->>MD: MarketSnapshot (source=coingecko)
+        end
         MD-->>PL: MarketSnapshot
         PL->>PL: Deterministic analysis
         PL-->>API: StreamEvent
         API-->>FE: SSE frame
     end
-    API-->>FE: report event
+    API-->>FE: report event (with source label)
     API-->>FE: done event
     FE->>FE: Render intelligence report
 ```
@@ -280,10 +318,51 @@ Tracked at runtime via `metricsTracker` singleton:
 - The stream closes cleanly after error
 - The client displays the error in a styled error card
 
+## Market Data Provider Chain
+
+The `MarketDataProvider` capability contract (`lib/binance-agent-os/types.ts`)
+is implemented by:
+
+| Provider | File | Status |
+|---|---|---|
+| `BinancePublicMarketDataProvider` | `binance-agent-os/market-data.ts` | **Primary**, active |
+| `CoinGeckoMarketDataProvider` | `binance-agent-os/coingecko.ts` | **Fallback**, active |
+| `ChainedMarketDataProvider` | `binance-agent-os/chain.ts` | Compose primary + fallback |
+
+The adapter (`adapter.ts`) returns a `ChainedMarketDataProvider` whose
+`runChain` tries Binance first and, on any Binance failure (network, restricted
+location, availability), fails over to CoinGecko. Each successful call is
+served by exactly one provider and is labeled honestly — fallback data is never
+claimed to be Binance data.
+
+### Data Source Transparency
+
+- The scanner response includes `source` metadata:
+  `{ provider, providerLabel, fallbackUsed, fetchedAt }` plus a per-asset
+  `source` field.
+- The analysis report's `marketData` carries `source`, `sourceLabel`, and
+  `fallbackUsed`.
+- The UI shows the active source on the scanner ("Market Data Source" notice)
+  and on each analysis asset summary, with a clear note when fallback was used.
+
+### CoinGecko Fallback Notes
+
+- No API key required for the endpoints used.
+- Ticker fields: price, 24h change, high, low, USD volume (base volume estimated
+  as quoteVolume ÷ price; trade count not exposed).
+- OHLC bars: real price bars from `/coins/{id}/ohlc`; volume is not returned by
+  that endpoint (the deterministic trend/volatility/drawdown modules use price
+  bars only, so analysis remains valid).
+- Rate limiting: the free tier (~10-30 req/min) is handled by (a) batching the
+  whole scanner universe into a single `/coins/markets` request and (b) retrying
+  transient `429`/`5xx` responses with backoff. Under extreme repeated load some
+  symbols may still fail and are reported as partial failures rather than
+  fabricated.
+
 ## Security Model
 
 - No private API keys required for core functionality
-- All market data from public Binance REST endpoints
+- All market data from public Binance REST / CoinGecko REST endpoints
 - No trading permissions, withdrawals, or account access
 - LLM API keys (if configured) are server-side only
 - OAuth tokens (if implemented) remain server-side
@@ -291,18 +370,38 @@ Tracked at runtime via `metricsTracker` singleton:
 
 ## Binance Agent OS / MCP Status
 
-**Current state**: Not active in the analysis or scanner pipeline.
+**Current state**: MCP is **NOT active** in the analysis or scanner pipeline.
 
-**Infrastructure explored**:
-- OAuth discovery using Protected Resource Metadata (PRM)
-- Authorization Server metadata discovery
-- SEP-991 compliant OAuth client metadata
-- MCP Streamable HTTP transport verification
+### MCP Integration Status (Phase 10 audit)
 
-**Reason for not active**: The Binance MCP endpoint requires OAuth
-authorization. Integration will proceed when the authorization flow is
-completed and confirmed working.
+| Aspect | Status |
+|---|---|
+| **Infrastructure** | Prepared, not active |
+| **Authentication** | OAuth discovery + PKCE infrastructure implemented; no completed, verified end-to-end authorization |
+| **Pipeline integration** | Not wired into scanner or analysis |
+| **Current limitation** | Binance MCP endpoint requires OAuth authorization; integration proceeds only when an authorized flow is confirmed working |
 
-**Architecture is modular**: The `MarketDataProvider` adapter pattern
-allows swapping in an MCP-backed provider without changing the analysis
-engine or agent pipeline.
+### What is implemented (real, server-side)
+
+- **Connectivity verification** (`lib/binance-mcp/client.ts`): performs a REAL
+  MCP initialize/`listTools` handshake against the official endpoint
+  `https://agent.binance.com/mcp/agentic`. Never mocks tools or versions.
+- **OAuth discovery** (`lib/binance-mcp/oauth-discovery.ts`): fetches and
+  validates live Protected Resource Metadata and Authorization Server Metadata
+  against the official `@modelcontextprotocol/sdk` schemas.
+- **OAuth client provider + session store** (`oauth-provider.ts`,
+  `oauth-session.ts`): implements the SDK's `OAuthClientProvider` and holds
+  state/verifier/tokens in-memory server-side only.
+- **Diagnostic routes**: `GET /api/mcp/verify`, `GET /api/mcp/discovery`,
+  `GET /api/auth/status`, `GET /api/auth/authorize`, `GET /api/auth/callback`.
+
+### Why MCP is not active
+
+The Binance MCP endpoint requires OAuth authorization. A valid, verified
+end-to-end authorization flow is not in place, so MCP is intentionally left
+out of the live data pipeline to avoid claiming unsupported functionality.
+The live pipeline uses Binance REST (primary) + CoinGecko REST (fallback).
+
+**Architecture is modular**: The `MarketDataProvider` adapter pattern allows
+swapping in an MCP-backed provider without changing the analysis engine or
+agent pipeline.

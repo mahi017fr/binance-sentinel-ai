@@ -82,17 +82,45 @@ export function DataSourceStatus() {
           <div className="mb-1 flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-[var(--muted)]" aria-hidden="true" />
             <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-300">
-              MCP Status
+              MCP Integration Status
             </span>
           </div>
           <p className="text-xs text-[var(--muted)]">
-            Not currently active in the data pipeline.
+            Binance MCP is prepared but not active.
           </p>
-          <p className="mt-1 text-[10px] leading-4 text-[var(--muted)]">
-            Agent OS OAuth discovery infrastructure implemented separately;
-            authenticated MCP pipeline integration is out of scope for this
-            phase.
-          </p>
+          <ul className="mt-1.5 space-y-1 text-[10px] leading-4 text-[var(--muted)]">
+            <li className="flex items-start gap-1.5">
+              <span className="mt-0.5 h-1 w-1 shrink-0 rounded-full bg-[var(--muted)]" aria-hidden="true" />
+              <span>
+                <span className="text-zinc-300">Infrastructure:</span> prepared —
+                real connectivity probe, OAuth discovery, client provider, and
+                diagnostic routes exist (server-side).
+              </span>
+            </li>
+            <li className="flex items-start gap-1.5">
+              <span className="mt-0.5 h-1 w-1 shrink-0 rounded-full bg-[var(--muted)]" aria-hidden="true" />
+              <span>
+                <span className="text-zinc-300">Authentication:</span> incomplete —
+                OAuth/PKCE scaffolding implemented, no verified end-to-end
+                authorization.
+              </span>
+            </li>
+            <li className="flex items-start gap-1.5">
+              <span className="mt-0.5 h-1 w-1 shrink-0 rounded-full bg-[var(--muted)]" aria-hidden="true" />
+              <span>
+                <span className="text-zinc-300">Pipeline integration:</span> none —
+                MCP is not wired into the scanner or analysis data flow.
+              </span>
+            </li>
+            <li className="flex items-start gap-1.5">
+              <span className="mt-0.5 h-1 w-1 shrink-0 rounded-full bg-[var(--muted)]" aria-hidden="true" />
+              <span>
+                <span className="text-zinc-300">Current limitation:</span> the Binance
+                MCP endpoint requires OAuth authorization; it is left out of the
+                live pipeline until a working authorized flow is confirmed.
+              </span>
+            </li>
+          </ul>
         </div>
 
         <div className="border-t border-[var(--border)]/50 pt-3">

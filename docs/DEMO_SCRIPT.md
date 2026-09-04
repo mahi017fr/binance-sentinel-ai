@@ -27,9 +27,17 @@ A concise 2–3 minute walkthrough of Binance Sentinel AI.
 
 **Click "Scan Market".**
 
-> "It's fetching real-time data from Binance's public API right now."
+> "It's fetching real-time market data right now — Binance's public API first,
+> with an automatic fallback to CoinGecko if Binance is unavailable."
 
-**Wait for results. Point out the table.**
+**Wait for results. Point out the "Market Data Source" indicator.**
+
+> "The data source is shown honestly. If Binance serves the data, it says
+> Binance. If the deployment environment blocks Binance, it automatically
+> falls back to CoinGecko — and clearly labels that as the source. Fallback
+> data is never claimed as Binance data."
+
+**Point out the table.**
 
 > "Each asset is classified by four deterministic metrics:
 > - **Volatility** — based on the 24h price range
@@ -44,9 +52,9 @@ A concise 2–3 minute walkthrough of Binance Sentinel AI.
 
 **Point out the Evaluation Panel and DataSourceStatus.**
 
-> "The evaluation panel shows real runtime metrics — scan latency,
-> success rate, data freshness. The data source is clearly shown as
-> Binance Public REST API. MCP is noted as not currently active."
+> "The evaluation panel shows real runtime metrics — scan latency, success
+> rate, data freshness. The data source panel documents the Binance →
+> CoinGecko chain and the MCP status."
 
 ---
 
@@ -70,7 +78,8 @@ A concise 2–3 minute walkthrough of Binance Sentinel AI.
 
 > "The report shows real deterministic scores — risk and readiness — with
 > full factor breakdowns, trend analysis, volatility metrics, and an
-> explainable intelligence panel. All from live market data."
+> explainable intelligence panel. All from live market data. The asset
+> summary also shows which provider served the data (Binance or CoinGecko)."
 
 ---
 
@@ -84,18 +93,28 @@ A concise 2–3 minute walkthrough of Binance Sentinel AI.
 
 **Point to the DataSourceStatus.**
 
-> "The system clearly shows that we're using Binance Public REST API.
-> MCP infrastructure exists but is not currently active in the pipeline.
-> When you come back to the scanner, the 'Back to Scanner' button
-> provides smooth navigation."
+> "The system clearly documents the provider chain — Binance primary with a
+> CoinGecko fallback — and marks which source actually served each scan.
+> MCP infrastructure exists but is not active. When you come back to the
+> scanner, the 'Back to Scanner' button provides smooth navigation."
 
 ---
 
-## 5. Security & Disclaimer (15 seconds)
+## 5. Market Intelligence / Session Overview (optional, 15 seconds)
+
+**If time permits, switch to the Workflow or Overview tab.**
+
+> "The Overview explains the five agent stages. The Workflow tab lets you
+> watch the pipeline progress in real time with per-stage durations."
+
+---
+
+## 6. Security & Disclaimer (15 seconds)
 
 > "No private API keys are required. No trading functionality exists.
 > No buy/sell recommendations. No account access. This is entirely
-> research and decision-support.
+> research and decision-support — it does not execute trades or guarantee
+> financial outcomes.
 >
 > Digital assets are volatile. Always do your own research."
 
@@ -103,9 +122,12 @@ A concise 2–3 minute walkthrough of Binance Sentinel AI.
 
 ## Key Points to Emphasize
 
-1. **Real data** — all values come from Binance public REST API
+1. **Real data** — all values come from Binance public REST API, or CoinGecko
+   when Binance is blocked (never mock/fabricated)
 2. **Deterministic** — no random scores, no fabricated values
-3. **Transparent** — every formula is documented
-4. **Modular** — MCP can be added later without changing the engine
-5. **Research only** — no trading, no recommendations
-6. **Graceful degradation** — partial failures don't crash the scanner
+3. **Transparent** — every formula is documented, and the active data source
+   is labeled on every scan and analysis
+4. **Resilient** — automatic Binance → CoinGecko failover with honest labeling
+5. **Modular** — MCP can be added later without changing the engine
+6. **Research only** — no trading, no recommendations
+7. **Graceful degradation** — partial failures don't crash the scanner

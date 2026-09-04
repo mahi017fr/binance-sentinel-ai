@@ -48,25 +48,31 @@ No trading functionality. No buy/sell recommendations. Research only.
   are reported without crashing the scan
 - **Session Metrics** — scanner and analysis performance tracking with
   averages across the session
-- **Fallback Transparency** — clear display of active data source, MCP
-  integration status, and fallback behavior
+- **Fallback Transparency** — clear display of active data source, provider
+  chain (Binance → CoinGecko), MCP integration status, and fallback behavior
+- **Data Source Metadata** — every scan and analysis labels the real provider
+  used (Binance or CoinGecko) with a fallback flag; fallback data is never
+  claimed as Binance
+- **Provider Chain** — tries Binance first, automatically fails over to
+  CoinGecko when Binance is unavailable
 
 ## Live Demo Workflow
 
 ```
 1. Open the app at http://localhost:3000
 2. Navigate to "Market Scanner" in the sidebar
-3. Click "Scan Market" to fetch live data from Binance
+3. Click "Scan Market" to fetch live data (Binance primary)
 4. Watch the scanner classify all assets in real time
-5. Use the search bar to filter by symbol (e.g. "BTC")
-6. Click any column header to sort (default: highest risk first)
-7. Set auto-refresh to "1m" to keep data current
-8. Review the Market Signals section for top gainer/loser/risk
-9. Click "Analyze" on any asset to launch the full agent pipeline
-10. Watch the 5-stage agent workflow progress in real time
-11. Review the Final Intelligence Report
-12. Click "Back to Scanner" to return and analyze another asset
-13. Check "Session Metrics" in the sidebar for runtime performance
+5. Note the "Market Data Source" indicator (Binance, or CoinGecko if Binance is blocked)
+6. Use the search bar to filter by symbol (e.g. "BTC")
+7. Click any column header to sort (default: highest risk first)
+8. Set auto-refresh to "1m" to keep data current
+9. Review the Market Signals section for top gainer/loser/risk
+10. Click "Analyze" on any asset to launch the full agent pipeline
+11. Watch the 5-stage agent workflow progress in real time
+12. Review the Final Intelligence Report (note the per-asset data source)
+13. Click "Back to Scanner" to return and analyze another asset
+14. Check "Session Metrics" in the sidebar for runtime performance
 ```
 
 ## User Flow
@@ -97,10 +103,9 @@ Next.js 16 UI (React 19)
 API Routes (App Router)
   |
   v
-Market Data Provider (Adapter Pattern)
-  |
-  v
-Binance Public REST API (no auth required)
+Chained Market Data Provider (Adapter Pattern)
+  |-- Primary:   Binance Public REST API (no auth)
+  |-- Fallback:  CoinGecko Public REST API (no auth)
   |
   v
 Deterministic Analysis Engine
@@ -122,18 +127,51 @@ SSE Streaming to Dashboard
 Professional Dark-theme Dashboard
 ```
 
-## Agent OS Integration Status
+## Agent Workflow
 
-- Binance Agent OS / MCP OAuth discovery infrastructure has been explored
-  using official Binance endpoints
-- The Binance MCP endpoint requires OAuth authorization
-- Self-built/custom agent support is being monitored based on official Binance
-  updates
-- **MCP is NOT currently the active data source** in the main analysis or
-  scanner pipelines
-- Current production market data uses live **Binance Public REST API**
-- The architecture is modular so MCP can be swapped in when authorization is
-  completed
+Each deep analysis runs a 5-stage multi-agent pipeline streamed to the UI in
+real time:
+
+1. **Intent Agent** — parses the query and identifies assets & intent
+2. **Market Agent** — fetches the live deterministic market snapshot
+3. **Risk Agent** — interprets scores into explainable drivers & observations
+4. **Research Agent** — composes a neutral, uncertainty-aware thesis
+5. **Report Agent** — assembles the final structured intelligence report
+
+The pipeline emits `agent-start`, `agent-complete`, `report`, and `done` SSE
+events so the user watches each stage progress with per-stage and total
+durations.
+
+## Market Data Sources
+
+| Priority | Provider | Auth | Fields |
+|---|---|---|---|
+| Primary | Binance Public REST API | None | price, 24h change, high, low, volume, klines |
+| Fallback | CoinGecko Public REST API | None | price, 24h change, high, low, USD volume, OHLC |
+
+The provider chain tries **Binance first**. If Binance is unavailable from the
+deployment environment (restricted location / network / availability), it
+fails over to **CoinGecko**. Fallback data is never claimed as Binance data —
+every response and UI indicator labels its real source.
+
+## Binance Agent OS / MCP Status
+
+**Current state**: MCP is **NOT** the active data source for the scanner or
+analysis pipeline.
+
+| Aspect | Status |
+|---|---|
+| Infrastructure | Prepared — real connectivity probe, OAuth discovery, client provider, and diagnostic routes (server-side) |
+| Authentication | Incomplete — OAuth/PKCE scaffolding exists; no verified end-to-end authorization |
+| Pipeline integration | None — MCP not wired into the data flow |
+| Current limitation | The Binance MCP endpoint requires OAuth authorization; integration proceeds only when a working authorized flow is confirmed |
+
+Diagnostic routes (`/api/mcp/verify`, `/api/mcp/discovery`, `/api/auth/status`)
+perform **real** connectivity and OAuth-discovery checks against the official
+Binance Agent MCP endpoint. Nothing is mocked or claimed as connected unless
+actually verified. The live pipeline uses Binance REST (primary) + CoinGecko
+REST (fallback). The modular `MarketDataProvider` adapter allows swapping in an
+MCP-backed provider when a verified authorized connection is available.
 
 ## Security Model
 
@@ -145,6 +183,21 @@ Professional Dark-theme Dashboard
 - OAuth tokens (if implemented later) remain server-side only
 - All market data is from public endpoints
 - Research-only design by default
+
+## Known Limitations
+
+- **Restricted deployment environments** may block Binance's public REST API;
+  the app automatically falls back to CoinGecko rather than failing.
+- **CoinGecko free-tier rate limits** (~10-30 req/min) are mitigated by batching
+  and retry/backoff; under extreme repeated load some symbols may be reported as
+  partial failures (never fabricated).
+- **CoinGecko OHLC** provides real price bars but not per-bar volume (the
+  analysis modules that rely on volume degrade gracefully; trend/volatility/
+  drawdown are price-based and unaffected).
+- **Binance MCP is not active** — OAuth authorization is not completed, so MCP
+  data is intentionally excluded from the live pipeline.
+- LLM report generation defaults to a deterministic reporter when no OpenAI key
+  is configured (the quantitative analysis is always real and deterministic).
 
 ## Evaluation
 
@@ -196,6 +249,9 @@ Open [http://localhost:3000](http://localhost:3000).
 Do not commit secrets or API keys to the repository.
 
 ## Disclaimer
+
+> **This project is research and decision-support software. It does not execute
+> trades or provide guaranteed financial outcomes.**
 
 This application is for **research and decision-support only**. It is not
 financial advice. No profit guarantees are made. Digital assets are volatile
