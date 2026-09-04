@@ -52,6 +52,30 @@ export function MarketSummary({ asset }: { asset: ReportAsset }) {
           <ActivityBadge activity={m.activity} level={m.activityLevel} />
         </div>
       </div>
+
+      {m.sourceLabel && (
+        <div>
+          <div className="text-[11px] uppercase tracking-wider text-[var(--muted)]">
+            Data Source
+          </div>
+          <div className="mt-0.5 flex items-center gap-1.5">
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                m.fallbackUsed ? "bg-[var(--info)]" : "bg-[var(--safe)]"
+              }`}
+              aria-hidden="true"
+            />
+            <span className="text-sm font-medium text-zinc-100">
+              {m.sourceLabel}
+            </span>
+            {m.fallbackUsed && (
+              <span className="text-[10px] text-[var(--info)]">
+                fallback
+              </span>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

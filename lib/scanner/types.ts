@@ -61,6 +61,8 @@ export const MarketScanAssetSchema = z.object({
   momentum: MomentumMetricSchema,
   risk: RiskMetricSchema,
   activity: ActivityMetricSchema,
+  /** Provider id that served this asset (e.g. "binance-public-api"). */
+  source: z.string(),
 });
 export type MarketScanAsset = z.infer<typeof MarketScanAssetSchema>;
 
@@ -88,6 +90,22 @@ export const ScannerFailureSchema = z.object({
 export type ScannerFailure = z.infer<typeof ScannerFailureSchema>;
 
 // ---------------------------------------------------------------------------
+// Data source metadata — reports which provider actually served the scan
+// ---------------------------------------------------------------------------
+
+export const ScannerSourceMetadataSchema = z.object({
+  /** Provider id that actually served the data. */
+  provider: z.string(),
+  /** Human-readable provider name. */
+  providerLabel: z.string(),
+  /** Whether a fallback provider was used (primary failed). */
+  fallbackUsed: z.boolean(),
+  /** ISO timestamp of when data was fetched. */
+  fetchedAt: z.string(),
+});
+export type ScannerSourceMetadata = z.infer<typeof ScannerSourceMetadataSchema>;
+
+// ---------------------------------------------------------------------------
 // Full scan result
 // ---------------------------------------------------------------------------
 
@@ -97,5 +115,7 @@ export const MarketScanResultSchema = z.object({
   assets: z.array(MarketScanAssetSchema),
   highlights: ScannerHighlightsSchema,
   failures: z.array(ScannerFailureSchema).optional(),
+  /** Source metadata describing which provider served the scan. */
+  source: ScannerSourceMetadataSchema,
 });
 export type MarketScanResult = z.infer<typeof MarketScanResultSchema>;

@@ -10,7 +10,16 @@
 import type { MarketAnalysisResult } from "@/lib/analysis/types";
 import type { MarketData } from "@/lib/llm/schema";
 
+const SOURCE_LABELS: Record<string, string> = {
+  "binance-public-api": "Binance",
+  "coingecko-public-api": "CoinGecko",
+};
+
 export function toReportMarketData(analysis: MarketAnalysisResult): MarketData {
+  const sourceId = analysis.source;
+  const sourceLabel = SOURCE_LABELS[sourceId] ?? sourceId;
+  const fallbackUsed = sourceId === "coingecko-public-api";
+
   return {
     price: analysis.snapshot.ticker.lastPrice,
     change24hPercent: analysis.snapshot.ticker.priceChangePercent,
@@ -46,5 +55,8 @@ export function toReportMarketData(analysis: MarketAnalysisResult): MarketData {
       contribution: f.contribution,
       explanation: f.explanation,
     })),
+    source: sourceId,
+    sourceLabel,
+    fallbackUsed,
   };
 }

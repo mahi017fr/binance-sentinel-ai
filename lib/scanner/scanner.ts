@@ -39,7 +39,7 @@
  * recommendations, no profit predictions, no trading functionality.
  */
 
-import { getMarketDataProvider } from "@/lib/binance-agent-os/adapter";
+import { getMarketDataProvider, getLastActiveProviderInfo } from "@/lib/binance-agent-os/adapter";
 import type { Ticker24h } from "@/lib/binance-agent-os/types";
 import { SCANNER_UNIVERSE } from "./universe";
 import {
@@ -47,8 +47,15 @@ import {
   type MarketScanResult,
   type ScannerFailure,
   type ScannerHighlights,
+  type ScannerSourceMetadata,
   MarketScanResultSchema,
 } from "./types";
+
+/** Human-readable labels for the provider ids reported in scan results. */
+const SOURCE_LABELS: Record<string, string> = {
+  "binance-public-api": "Binance",
+  "coingecko-public-api": "CoinGecko",
+};
 
 // ---------------------------------------------------------------------------
 // Volatility classification
@@ -223,15 +230,20 @@ function buildHighlights(assets: MarketScanAsset[]): ScannerHighlights {
 export async function scanMarketUniverse(): Promise<MarketScanResult> {
   const provider = getMarketDataProvider();
   const universe = [...SCANNER_UNIVERSE];
+  const fetchedAt = new Date().toISOString();
 
   // Fetch all tickers in parallel — one call per symbol.
-  // We use getTicker24h (public, no auth) for each symbol.
   const results = await Promise.allSettled(
     universe.map(async (sym) => {
       const ticker = await provider.getTicker24h(sym);
       return { symbol: sym, ticker };
     })
   );
+
+  // The chain records which provider most recently answered a call. After all
+  // parallel calls resolve, this reflects the provider that actually served
+  // the scan (e.g. CoinGecko when Binance is blocked).
+  const activeProviderId = getLastActiveProviderInfo()?.id ?? "unknown";
 
   // Separate successes from failures.
   const tickers: { symbol: string; ticker: Ticker24h }[] = [];
@@ -240,7 +252,7 @@ export async function scanMarketUniverse(): Promise<MarketScanResult> {
   for (let i = 0; i < results.length; i++) {
     const result = results[i];
     if (result.status === "fulfilled") {
-      tickers.push(result.value);
+      tickers.push({ symbol: universe[i], ticker: result.value.ticker });
     } else {
       const sym = universe[i];
       failures.push({
@@ -256,6 +268,21 @@ export async function scanMarketUniverse(): Promise<MarketScanResult> {
   // Compute universe average volume for relative activity classification.
   const totalVolume = tickers.reduce((sum, t) => sum + t.ticker.quoteVolume, 0);
   const avgVolume = tickers.length > 0 ? totalVolume / tickers.length : 0;
+
+  // Determine which providers actually served this scan. When Binance is
+  // blocked from the deployment environment, all assets fall through to the
+  // CoinGecko fallback, so the active provider applies to the whole scan.
+  // If no asset could be fetched at all, the source is unknown and no fallback
+  // was "used" (nothing was served by any provider).
+  const servedAny = tickers.length > 0;
+  const fallbackUsed = servedAny && activeProviderId !== "binance-public-api";
+
+  const sourceMetadata: ScannerSourceMetadata = {
+    provider: activeProviderId,
+    providerLabel: SOURCE_LABELS[activeProviderId] ?? activeProviderId,
+    fallbackUsed,
+    fetchedAt,
+  };
 
   // Classify each asset.
   const assets: MarketScanAsset[] = tickers.map(({ ticker }) => {
@@ -282,6 +309,7 @@ export async function scanMarketUniverse(): Promise<MarketScanResult> {
       momentum,
       risk,
       activity,
+      source: activeProviderId,
     };
   });
 
@@ -293,6 +321,7 @@ export async function scanMarketUniverse(): Promise<MarketScanResult> {
     assets,
     highlights,
     failures: failures.length > 0 ? failures : undefined,
+    source: sourceMetadata,
   };
 
   // Validate the result shape.

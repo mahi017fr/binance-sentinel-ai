@@ -84,6 +84,7 @@ export interface MarketSnapshot {
 
 export type MarketDataSourceId =
   | "binance-public-api"
+  | "coingecko-public-api"
   | "binance-agent-os"
   | "binance-mcp";
 
@@ -91,6 +92,21 @@ export type MarketDataSourceId =
 export interface MarketDataSourceInfo {
   id: MarketDataSourceId;
   name: string;
+}
+
+/**
+ * Source metadata returned with every scan/analysis response.
+ * Exposes which provider actually served the data and whether a fallback was used.
+ */
+export interface ScanSourceMetadata {
+  /** The provider that actually served the data. */
+  provider: MarketDataSourceId;
+  /** Human-readable provider name. */
+  providerLabel: string;
+  /** Whether a fallback provider was used (i.e., primary provider failed). */
+  fallbackUsed: boolean;
+  /** ISO timestamp of when the data was fetched. */
+  fetchedAt: string;
 }
 
 /**

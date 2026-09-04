@@ -292,6 +292,40 @@ export function MarketScanner({ onAnalyzeAsset }: MarketScannerProps) {
       {/* Results */}
       {status === "done" && result && (
         <div className="space-y-6 animate-fade-up">
+          {/* Data source notice */}
+          {result.source && (
+            <Card pad className="border-[var(--border)]/60 bg-[var(--surface)]/60">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      result.source.fallbackUsed
+                        ? "bg-[var(--info)]"
+                        : "bg-[var(--safe)]"
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-300">
+                    Market Data Source
+                  </span>
+                </div>
+                <span className="text-sm font-medium text-zinc-100">
+                  {result.source.providerLabel}
+                </span>
+                {result.source.fallbackUsed ? (
+                  <span className="text-xs text-[var(--info)]">
+                    Binance unavailable in this environment — using public
+                    fallback provider.
+                  </span>
+                ) : (
+                  <span className="text-xs text-[var(--muted)]">
+                    Direct from Binance public API.
+                  </span>
+                )}
+              </div>
+            </Card>
+          )}
+
           {/* Summary cards */}
           <ScannerSummary result={result} />
 

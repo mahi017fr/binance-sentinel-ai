@@ -141,6 +141,12 @@ export const MarketDataSchema = z.object({
   riskFactors: z.array(FactorBreakdown),
   /** Deterministic readiness-score factor breakdown (signal 0..1 each). */
   readinessFactors: z.array(FactorBreakdown),
+  /** Provider id that served the market data (e.g. binance-public-api). */
+  source: z.string().optional(),
+  /** Human-readable provider label. */
+  sourceLabel: z.string().optional(),
+  /** Whether a fallback provider was used for this asset's market data. */
+  fallbackUsed: z.boolean().optional(),
 });
 export type MarketData = z.infer<typeof MarketDataSchema>;
 
