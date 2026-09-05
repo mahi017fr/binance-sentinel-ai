@@ -137,6 +137,14 @@ export const MarketDataSchema = z.object({
     /** Max drawdown within window, decimal. */
     max: z.number(),
   }),
+  /**
+   * Recent close prices (oldest → newest) taken directly from the klines the
+   * market agent already fetched for this asset. Present whenever OHLC history
+   * is available; intentionally NOT modeled as guaranteed or predictive.
+   */
+  priceSeries: z.array(z.number()).optional(),
+  /** Kline interval `priceSeries` was sampled at, e.g. "1h". */
+  interval: z.string().optional(),
   /** Deterministic risk-score factor breakdown (signal 0..1 each). */
   riskFactors: z.array(FactorBreakdown),
   /** Deterministic readiness-score factor breakdown (signal 0..1 each). */

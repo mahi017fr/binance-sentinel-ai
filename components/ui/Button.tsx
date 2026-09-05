@@ -6,7 +6,7 @@ const VARIANTS: Record<Variant, string> = {
   primary:
     "bg-[#f0b90b] text-zinc-900 hover:bg-[#d1a20a] focus-visible:ring-[#f0b90b]",
   secondary:
-    "border border-[var(--border)] bg-[var(--surface-raised)] text-[var(--foreground)] hover:bg-[#1f2330] focus-visible:ring-[var(--border)]",
+    "border border-[var(--border)] bg-[var(--surface-raised)] text-[var(--foreground)] hover:bg-[#171920] focus-visible:ring-[var(--border)]",
   ghost:
     "text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-raised)] focus-visible:ring-[var(--border)]",
 };

@@ -1,5 +1,5 @@
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { SentinelCommandCenter } from "@/components/command-center/SentinelCommandCenter";
 
 export default function Home() {
-  return <DashboardLayout />;
+  return <SentinelCommandCenter />;
 }

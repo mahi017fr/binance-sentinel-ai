@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import type { MarketScanResult } from "@/lib/scanner/types";
-import type { SortConfig, SortKey } from "./ScannerTable";
+import type { SortConfig, SortKey } from "@/components/scanner/ScannerTable";
+import { sortAssets } from "@/lib/scanner/sort";
 import { UNIVERSE_LABEL, UNIVERSE_DESCRIPTION } from "@/lib/scanner/universe";
-import { metricsTracker } from "@/lib/evaluation/metrics";
+import { useMarketScan } from "@/hooks/useMarketScan";
 import { ScannerSummary } from "./ScannerSummary";
 import { ScannerTable } from "./ScannerTable";
 import { ScannerHighlights } from "./ScannerHighlights";
@@ -14,7 +14,6 @@ import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { Spinner } from "@/components/ui/Spinner";
 
-type ScanStatus = "idle" | "loading" | "done" | "error";
 type AutoRefreshInterval = "off" | "30s" | "1m" | "5m";
 
 const REFRESH_OPTIONS: { label: string; value: AutoRefreshInterval; ms: number }[] = [
@@ -24,116 +23,17 @@ const REFRESH_OPTIONS: { label: string; value: AutoRefreshInterval; ms: number }
   { label: "5m", value: "5m", ms: 300_000 },
 ];
 
-function getSortValue(
-  asset: MarketScanResult["assets"][number],
-  key: SortKey
-): number {
-  if (!asset) return 0;
-  switch (key) {
-    case "symbol":
-      return 0;
-    case "price":
-      return asset.price ?? 0;
-    case "change24h":
-      return asset.change24h ?? 0;
-    case "volatility":
-      return asset.volatility?.value ?? 0;
-    case "momentum":
-      return asset.momentum?.value ?? 0;
-    case "risk":
-      return asset.risk?.score ?? 0;
-    case "activity":
-      return asset.activity?.value ?? 0;
-    default:
-      return 0;
-  }
-}
-
-function sortAssets(
-  assets: MarketScanResult["assets"],
-  sort: SortConfig
-): MarketScanResult["assets"] {
-  const sorted = [...assets].sort((a, b) => {
-    if (sort.key === "symbol") {
-      return sort.direction === "asc"
-        ? a.symbol.localeCompare(b.symbol)
-        : b.symbol.localeCompare(a.symbol);
-    }
-    const diff = getSortValue(a, sort.key) - getSortValue(b, sort.key);
-    return sort.direction === "asc" ? diff : -diff;
-  });
-  return sorted;
-}
-
 interface MarketScannerProps {
   onAnalyzeAsset?: (symbol: string) => void;
 }
 
 export function MarketScanner({ onAnalyzeAsset }: MarketScannerProps) {
-  const [status, setStatus] = useState<ScanStatus>("idle");
-  const [result, setResult] = useState<MarketScanResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { status, result, error, scan } = useMarketScan();
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortConfig>({ key: "risk", direction: "desc" });
   const [autoRefresh, setAutoRefresh] = useState<AutoRefreshInterval>("off");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef = useRef(true);
-
-  const handleScan = useCallback(async () => {
-    setStatus("loading");
-    setError(null);
-
-    const startTime = performance.now();
-
-    try {
-      const res = await fetch("/api/market-scan");
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw new Error(
-          body?.error ?? `Scan failed with status ${res.status}`
-        );
-      }
-      const data: MarketScanResult = await res.json();
-
-      // Defensive: ensure required arrays exist
-      if (!data || !Array.isArray(data.assets) || !Array.isArray(data.universe)) {
-        throw new Error("Scan returned malformed data. Please try again.");
-      }
-
-      const latencyMs = performance.now() - startTime;
-
-      const requestedCount = data.universe.length;
-      const failureCount = data.failures?.length ?? 0;
-      const successCount = requestedCount - failureCount;
-
-      metricsTracker.recordScan(
-        latencyMs,
-        successCount,
-        requestedCount,
-        failureCount,
-        data.scannedAt
-      );
-
-      // Defensive: ensure highlights exists with required arrays
-      if (!data.highlights || typeof data.highlights !== "object") {
-        data.highlights = {
-          highVolatility: [],
-          strongMomentum: [],
-          elevatedRisk: [],
-          highActivity: [],
-          topMovers: [],
-        };
-      }
-
-      setResult(data);
-      setStatus("done");
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Scan failed unexpectedly.";
-      setError(message);
-      setStatus("error");
-    }
-  }, []);
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -156,8 +56,8 @@ export function MarketScanner({ onAnalyzeAsset }: MarketScannerProps) {
       if (ms > 0) {
         timerRef.current = setInterval(() => {
           if (mountedRef.current) {
-            handleScan().catch(() => {
-              // Auto-refresh scan failed; error state is set inside handleScan.
+            scan().catch(() => {
+              // Auto-refresh scan failed; error state is set inside scan().
             });
           }
         }, ms);
@@ -167,7 +67,7 @@ export function MarketScanner({ onAnalyzeAsset }: MarketScannerProps) {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [autoRefresh, status, handleScan]);
+  }, [autoRefresh, status, scan]);
 
   const handleSort = useCallback((key: SortKey) => {
     setSort((prev) => ({
@@ -234,7 +134,7 @@ export function MarketScanner({ onAnalyzeAsset }: MarketScannerProps) {
               </button>
             ))}
           </div>
-          <Button onClick={handleScan} disabled={status === "loading"}>
+          <Button onClick={() => scan()} disabled={status === "loading"}>
             {status === "loading" ? (
               <>
                 <Spinner className="h-4 w-4" label="Scanning" />

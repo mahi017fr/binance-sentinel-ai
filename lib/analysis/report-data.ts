@@ -17,6 +17,13 @@ const SOURCE_LABELS: Record<string, string> = {
   "coingecko-public-api": "CoinGecko",
 };
 
+/**
+ * How many recent closes are carried into the report for the UI price chart.
+ * The pipeline may fetch more, but the chart stays uncluttered at ~2 days of
+ * a 1h window (48 bars) while still communicating the recent trend.
+ */
+const PRICE_SERIES_POINTS = 48;
+
 export function toReportMarketData(analysis: MarketAnalysisResult): MarketData {
   const sourceId = analysis.source;
   const sourceLabel = SOURCE_LABELS[sourceId] ?? sourceId;
@@ -41,6 +48,13 @@ export function toReportMarketData(analysis: MarketAnalysisResult): MarketData {
       current: analysis.drawdown.currentDrawdown,
       max: analysis.drawdown.maxDrawdown,
     },
+    priceSeries:
+      analysis.snapshot.klines.length > 1
+        ? analysis.snapshot.klines
+            .slice(-PRICE_SERIES_POINTS)
+            .map((k) => k.close)
+        : undefined,
+    interval: analysis.interval,
     riskFactors: analysis.risk.factors.map((f) => ({
       key: f.key,
       name: f.name,
