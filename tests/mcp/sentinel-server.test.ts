@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import type { Icon } from "@modelcontextprotocol/sdk/types.js";
 import {
   createSentinelMcpServer,
+  createSentinelMcpServerWithBranding,
   SENTINEL_MCP_NAME,
   SENTINEL_MCP_VERSION,
 } from "@/lib/mcp/sentinel-server";
@@ -97,5 +99,40 @@ describe("createSentinelMcpServer", () => {
     expect(data.researchOnly).toBe(true);
     expect(data.directionalSignal).toBeDefined();
     expect(Array.isArray(data.evidence)).toBe(true);
+  });
+
+  it("exposes branded icons via tools/list when branding is configured", async () => {
+    const iconUrl = "https://acme.example/icon.svg";
+    const client = new Client({ name: "sentinel-brand-client", version: "1.0.0" });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const mcpServer = createSentinelMcpServerWithBranding({ iconUrl });
+    await mcpServer.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    const { tools } = await client.listTools();
+    expect(tools).toHaveLength(3);
+
+    for (const tool of tools) {
+      const icons = tool.icons as Icon[] | undefined;
+      expect(icons).toBeDefined();
+      const svg = icons!.find((i) => i.mimeType === "image/svg+xml");
+      const png = icons!.find((i) => i.mimeType === "image/png");
+      expect(svg).toBeDefined();
+      expect(svg!.src).toBe(iconUrl);
+      expect(svg!.sizes).toEqual(["any"]);
+      expect(png).toBeDefined();
+      expect(png!.src).toBe("https://acme.example/icon-96.png");
+      expect(png!.sizes).toContain("96x96");
+      // Still functions and remains read-only even when branded.
+      const result = await client.callTool({
+        name: "get_current_price",
+        arguments: { symbol: "BTCUSDT" },
+      });
+      expect(result.isError).toBeFalsy();
+      expect(tool.annotations?.readOnlyHint).toBe(true);
+    }
+
+    await client.close();
+    await mcpServer.close();
   });
 });

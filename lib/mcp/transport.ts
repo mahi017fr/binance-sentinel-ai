@@ -12,12 +12,27 @@
 
 import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import { createSentinelMcpServer } from "./sentinel-server";
+import {
+  createSentinelMcpServerWithBranding,
+  type SentinelMcpBranding,
+} from "./sentinel-server";
 
 const ALLOWED_METHODS = "GET, POST, DELETE, OPTIONS";
 const ALLOWED_HEADERS =
   "content-type, mcp-session-id, mcp-protocol-version, last-event-id, authorization";
 const EXPOSED_HEADERS = "mcp-session-id, mcp-protocol-version";
+
+/** Public origin of the deployed app (drives the absolute tool icon URL). */
+function publicOrigin(): string {
+  return process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/+$/, "") ?? "";
+}
+
+/** Resolve branding lazily so the env var can be read fresh per deployment. */
+function resolvedBranding(): SentinelMcpBranding {
+  const origin = publicOrigin();
+  if (!origin) return {};
+  return { iconUrl: `${origin}/icon.svg` };
+}
 
 function withCorsHeaders(response: Response): Response {
   const headers = new Headers(response.headers);
@@ -66,7 +81,7 @@ export async function handleMcpRequest(
   const transportOptions =
     options.keepAliveMs !== undefined ? { keepAliveMs: options.keepAliveMs } : {};
   const transport = new WebStandardStreamableHTTPServerTransport(transportOptions);
-  const server = createSentinelMcpServer();
+  const server = createSentinelMcpServerWithBranding(resolvedBranding());
 
   try {
     await server.connect(transport);

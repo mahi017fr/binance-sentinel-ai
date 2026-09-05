@@ -96,6 +96,31 @@ human-readable message — never a stack trace or internal detail:
 - Provider unavailable → `"Market data is temporarily unavailable."`
 - Analysis failure → `"Sentinel analysis could not be completed."`
 
+## Branding & icon
+
+- Service name shown in Claude remains **"Binance Sentinel AI"** (see
+  `SENTINEL_MCP_NAME`).
+- Claude's connector permission dialog icon is driven by the MCP **`Tool.icons`**
+  metadata returned by `tools/list`. The MCP protocol (2025-11-25) has **no
+  server/connector-level icon field**, so this connector advertises a custom
+  branded icon per tool. When `NEXT_PUBLIC_BASE_URL` is set (as in production),
+  each tool exposes:
+  - `https://<host>/icon.svg` (`image/svg+xml`, scalable "any")
+  - `https://<host>/icon-96.png` (`image/png`, `96x96`) as a raster fallback
+- The icon is an original **Sentinel** mark in Binance's brand palette on a dark
+  background. The official Binance logo/trademark is intentionally **not** used
+  (Binance's brand terms restrict it to press/media use, and Claude renders the
+  icon only from the `Tool.icons` metadata — we don't impersonate Binance).
+- A disclaimer is delivered via `InitializeResult.instructions`: this is a
+  **community-built, research-only** project using Binance public market data,
+  **not** an official or affiliated Binance product.
+
+> Claude-side note: Claude derives the connector avatar from per-tool `icons`
+> metadata (and the tool name). There is no separate "server icon" field in the
+> current MCP protocol, so how prominently the icon appears in the permission
+> modal is controlled by Claude's client, not by this server. Tool function is
+> unchanged.
+
 ## Example prompts
 
 > "What is the current price and 24h change of BTCUSDT?"

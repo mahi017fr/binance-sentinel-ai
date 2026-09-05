@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { Readable } from "node:stream";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { Icon, Tool } from "@modelcontextprotocol/sdk/types.js";
 import { handleMcpRequest, mcpPreflightResponse } from "@/lib/mcp/transport";
 import { resetFakeProvider } from "./mocks";
 
@@ -154,6 +154,8 @@ let server: TestServer | undefined;
 
 beforeEach(async () => {
   resetFakeProvider();
+  // Simulate a deployed origin so the branded tool icons are advertised.
+  process.env.NEXT_PUBLIC_BASE_URL = "https://acme.example";
   server = await startTestServer();
 });
 
@@ -294,6 +296,15 @@ describe("SDK Client E2E over Streamable HTTP", () => {
       "get_current_price",
       "get_market_data",
     ]);
+
+    // Each advertised tool carries the branded icon (SVG + PNG) from our own
+    // deployment under NEXT_PUBLIC_BASE_URL, per the MCP Tool.icons field.
+    for (const tool of tools) {
+      const icons = tool.icons as Icon[] | undefined;
+      expect(icons).toBeDefined();
+      expect(icons!.some((i) => i.mimeType === "image/svg+xml")).toBe(true);
+      expect(icons!.some((i) => i.mimeType === "image/png")).toBe(true);
+    }
 
     const price = await client.callTool({
       name: "get_current_price",
