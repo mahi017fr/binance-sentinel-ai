@@ -21,8 +21,8 @@ import { analyzeMarket } from "@/lib/analysis/market-analysis";
 import { toReportMarketData } from "@/lib/analysis/report-data";
 import type { MarketAnalysisResult } from "@/lib/analysis/types";
 import {
-  getLastActiveProviderInfo,
-  getMarketDataProvider,
+  getPublicMarketDataProvider,
+  getPublicSourceInfo,
 } from "@/lib/binance-agent-os/adapter";
 import type { MarketDataSourceId } from "@/lib/binance-agent-os/types";
 import { mockMarketThesis, mockRiskInterpretation } from "@/lib/llm/mock";
@@ -54,9 +54,18 @@ export class McpToolError extends Error {
   }
 }
 
-/** Provider id that actually served the most recent call (or the default). */
+/**
+ * Public Binance → CoinGecko chain, independent of any
+ * `BINANCE_MARKET_DATA_PROVIDER` override (CLI/MCP backends cannot run in the
+ * serverless runtime serving Claude). Resolved lazily per call. Read-only.
+ */
+function publicProvider() {
+  return getPublicMarketDataProvider();
+}
+
+/** Provider id that actually served the most recent public-chain call. */
 function activeSourceId(): MarketDataSourceId {
-  return getLastActiveProviderInfo()?.id ?? getMarketDataProvider().id;
+  return getPublicSourceInfo().id;
 }
 
 function sourceLabel(sourceId: MarketDataSourceId): string {
@@ -98,11 +107,10 @@ export interface CurrentPriceResult {
 
 export async function getCurrentPrice(rawSymbol: string): Promise<CurrentPriceResult> {
   const symbol = resolveSupportedSymbol(rawSymbol);
-  const provider = getMarketDataProvider();
 
   let ticker;
   try {
-    ticker = await provider.getTicker24h(symbol);
+    ticker = await publicProvider().getTicker24h(symbol);
   } catch {
     throw new McpToolError("Market data is temporarily unavailable.", "provider");
   }
@@ -154,11 +162,10 @@ export interface MarketDataResult {
 
 export async function getMarketData(rawSymbol: string): Promise<MarketDataResult> {
   const symbol = resolveSupportedSymbol(rawSymbol);
-  const provider = getMarketDataProvider();
 
   let snapshot;
   try {
-    snapshot = await provider.getMarketSnapshot(symbol, {
+    snapshot = await publicProvider().getMarketSnapshot(symbol, {
       interval: "1d",
       klineLimit: 100,
     });
@@ -261,7 +268,7 @@ export async function analyzeMarketTool(rawSymbol: string): Promise<AnalyzeMarke
 
   let analysis: MarketAnalysisResult;
   try {
-    analysis = await analyzeMarket(symbol);
+    analysis = await analyzeMarket(symbol, { provider: publicProvider() });
   } catch {
     throw new McpToolError("Sentinel analysis could not be completed.", "analysis");
   }

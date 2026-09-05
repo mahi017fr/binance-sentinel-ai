@@ -5,6 +5,11 @@ vi.mock("@/lib/binance-agent-os/adapter", async () => {
   const { providerState } = await import("./state");
   return {
     getMarketDataProvider: () => providerState.provider!,
+    getPublicMarketDataProvider: () => providerState.provider!,
+    getPublicSourceInfo: () =>
+      providerState.provider
+        ? { id: providerState.provider.id, name: providerState.provider.name }
+        : { id: "binance-public-api", name: "Binance Public Market Data API" },
     getLastActiveProviderInfo: () =>
       providerState.provider
         ? { id: providerState.provider.id, name: providerState.provider.name }

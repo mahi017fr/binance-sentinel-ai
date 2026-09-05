@@ -95,6 +95,21 @@ export function getMarketDataProvider(): MarketDataProvider {
 }
 
 /**
+ * Return the default PUBLIC market-data chain (Binance → CoinGecko),
+ * regardless of any `BINANCE_MARKET_DATA_PROVIDER` override.
+ *
+ * The override exists for LOCAL testing of the CLI/MCP backends. Those backends
+ * need a local `binance-cli` binary or a confidential access token and cannot
+ * run inside a serverless function. Consumers that must ALWAYS work from a
+ * deployed runtime (e.g. the public Claude MCP endpoint) use this resolver so
+ * an override can never silently switch them onto an unusable backend. Marked
+ * read-only: it only resolves the same cached public chain.
+ */
+export function getPublicMarketDataProvider(): MarketDataProvider {
+  return getDefaultChain();
+}
+
+/**
  * Return a snapshot of the currently active data source (for UI/debugging).
  * Describes the resolved chain: primary + fallbacks.
  */
@@ -135,6 +150,22 @@ export function getLastActiveProviderInfo(): MarketDataSourceInfo | null {
   if (!defaultChain) return null;
   const active = defaultChain.lastActiveProvider;
   return active ? { id: active.id, name: active.name } : null;
+}
+
+/**
+ * Return the provider that actually served the most recent call, mirroring
+ * `getLastActiveProviderInfo()` but scoped to the PUBLIC chain only — so an
+ * env-forced backend (CLI/MCP, which cannot run in a serverless runtime) never
+ * masquerades as the source behind public consumers like the MCP endpoint.
+ */
+export function getPublicSourceInfo(): MarketDataSourceInfo {
+  if (defaultChain?.lastActiveProvider) {
+    return {
+      id: defaultChain.lastActiveProvider.id,
+      name: defaultChain.lastActiveProvider.name,
+    };
+  }
+  return { id: BINANCE_ID, name: "Binance Public Market Data API" };
 }
 
 // Kept for future registration of an Agent OS-backed provider without

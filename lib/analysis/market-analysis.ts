@@ -19,6 +19,7 @@
  */
 
 import type { KlineInterval, MarketSnapshot } from "@/lib/binance-agent-os/types";
+import type { MarketDataProvider } from "@/lib/binance-agent-os/types";
 import { getMarketDataProvider } from "@/lib/binance-agent-os/adapter";
 import { analyzeTrend } from "./trend";
 import { analyzeVolatility } from "./volatility";
@@ -38,6 +39,13 @@ export interface MarketAnalysisOptions {
   interval?: KlineInterval;
   /** Number of klines to fetch. Defaults to 200. */
   klineLimit?: number;
+  /**
+   * Explicit provider to analyze with. Defaults to the globally active
+   * provider (`getMarketDataProvider()`). Consumers that must work from a
+   * deployed runtime regardless of local backend overrides (e.g. the public
+   * Claude MCP endpoint) pass the public Binance → CoinGecko chain here.
+   */
+  provider?: MarketDataProvider;
 }
 
 const DEFAULT_INTERVAL: KlineInterval = "1d";
@@ -81,7 +89,7 @@ export async function analyzeMarket(
   const interval = options.interval ?? DEFAULT_INTERVAL;
   const klineLimit = options.klineLimit ?? DEFAULT_KLINE_LIMIT;
 
-  const provider = getMarketDataProvider();
+  const provider = options.provider ?? getMarketDataProvider();
   const symbol = rawSymbol.trim().toUpperCase();
 
   if (!symbol) {
