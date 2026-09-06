@@ -99,13 +99,17 @@ interface RawCoinMarket {
   last_updated?: string;
 }
 
-interface RawKlineBar {
-  time: number;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-}
+/**
+ * CoinGecko OHLC bar: `[time(ms), open, high, low, close]`.
+ * The endpoint returns each bar as a 5-element array, not an object.
+ */
+type RawKlineBar = [
+  time: number,
+  open: number,
+  high: number,
+  low: number,
+  close: number
+];
 
 /**
  * Request coalescing: when many consumers request different coins' tickers at
@@ -301,17 +305,19 @@ export class CoinGeckoMarketDataProvider implements MarketDataProvider {
     // is [time(ms), open, high, low, close]. Volume is not returned by the
     // OHLC endpoint; set it to 0 (volume is not used by the analysis trend /
     // volatility / drawdown modules, which rely on price bars).
-    const klines: Kline[] = raw.map((bar) => ({
-      openTime: bar.time,
-      open: bar.open,
-      high: bar.high,
-      low: bar.low,
-      close: bar.close,
-      volume: 0,
-      closeTime: bar.time + (intervalMs(interval) - 1),
-      quoteAssetVolume: 0,
-      numberOfTrades: 0,
-    }));
+    const klines: Kline[] = raw.map(
+      ([time, open, high, low, close]): Kline => ({
+        openTime: time,
+        open,
+        high,
+        low,
+        close,
+        volume: 0,
+        closeTime: time + (intervalMs(interval) - 1),
+        quoteAssetVolume: 0,
+        numberOfTrades: 0,
+      })
+    );
 
     // Cap to the requested limit (CoinGecko returns far fewer bars than 200).
     return klines.slice(-limit);
