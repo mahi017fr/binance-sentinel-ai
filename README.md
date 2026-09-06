@@ -65,7 +65,8 @@ No trading functionality. No buy/sell recommendations. Research only.
 ## Live Demo Workflow
 
 ```
-1. Open the app at http://localhost:3000
+1. Open the app at https://binance-sentinel-ai.vercel.app/
+
 2. Navigate to "Market Scanner" in the sidebar
 3. Click "Scan Market" to fetch live data (Binance primary)
 4. Watch the scanner classify all assets in real time
