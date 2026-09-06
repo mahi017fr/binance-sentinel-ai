@@ -282,7 +282,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open (https://binance-sentinel-ai.vercel.app/).
 
 The app works out of the box with **no environment variables** (public Binance
 REST → CoinGecko fallback, deterministic LLM mode).
@@ -303,19 +303,7 @@ REST → CoinGecko fallback, deterministic LLM mode).
 | `OPENAI_MODEL` | `gpt-4o-mini` | Model to use with OpenAI |
 | `NEXT_PUBLIC_BASE_URL` | `http://localhost:3000` | Public URL for OAuth client metadata |
 
-> Note: `ANTHROPIC_API_KEY` appears in `.env.example` for reference only; the
 > current LLM client resolves `mock` or `openai`, so Anthropic is not wired yet.
-
-## Deployment
-
-### Vercel
-
-1. Push to a Git repository
-2. Import in the [Vercel dashboard](https://vercel.com)
-3. No environment variables are required for basic functionality
-4. Deploy — the app is fully functional with public Binance data
-
-Do not commit secrets or API keys to the repository.
 
 ## Disclaimer
 
